@@ -175,9 +175,9 @@ const panelFace = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 9.1), new THREE.M
   panelFace.position.z = 0.27; panel.add(glass, panelFace);
 }
 const trail = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
-  uniforms: { r: { value: 0 }, c1: { value: C.blue.clone().multiplyScalar(1.8) }, c2: { value: C.teal.clone().multiplyScalar(1.8) } },
+  uniforms: { r: { value: 0 }, dim: { value: 1 }, c1: { value: C.blue.clone().multiplyScalar(1.8) }, c2: { value: C.teal.clone().multiplyScalar(1.8) } },
   vertexShader: 'varying vec2 vUv;varying float vd;void main(){vUv=uv;vec4 mv=modelViewMatrix*vec4(position,1.);vd=-mv.z;gl_Position=projectionMatrix*mv;}',
-  fragmentShader: 'uniform float r;uniform vec3 c1;uniform vec3 c2;varying vec2 vUv;varying float vd;void main(){float x=vUv.x;if(x>r)discard;float head=exp(-pow((r-x)*120.,2.))*1.5;float near=smoothstep(6.,45.,vd);gl_FragColor=vec4(mix(c1,c2,smoothstep(.1,1.,x))*(.7+head),near*(.25+.75*smoothstep(0.,.15,x))*(.75+head));}' }));
+  fragmentShader: 'uniform float r;uniform float dim;uniform vec3 c1;uniform vec3 c2;varying vec2 vUv;varying float vd;void main(){float x=vUv.x;if(x>r)discard;float head=exp(-pow((r-x)*120.,2.))*1.5;float near=smoothstep(6.,45.,vd);gl_FragColor=vec4(mix(c1,c2,smoothstep(.1,1.,x))*(.7+head),near*(.25+.75*smoothstep(0.,.15,x))*(.75+head)*dim);}' }));
 trail.visible = false; scene.add(trail);
 const comet = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(256, 256, (c) => { const g = c.createRadialGradient(128, 128, 0, 128, 128, 128); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.15, 'rgba(160,255,240,.7)'); g.addColorStop(0.5, 'rgba(63,224,204,.15)'); g.addColorStop(1, 'rgba(63,224,204,0)'); c.fillStyle = g; c.fillRect(0, 0, 256, 256); }), color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
 const dust = (() => {
@@ -492,8 +492,8 @@ function ignite(preview) {
   // la rotta: sale in verticale, si inclina verso la Terra e la raggiunge in orbita (la Terra resta sempre davanti, dietro al razzo)
   const route = new THREE.CatmullRomCurve3([start, start.clone().add(new THREE.Vector3(0, 40, 0)), start.clone().add(new THREE.Vector3(-4, 135, -55)), start.clone().add(new THREE.Vector3(-14, 290, -430)),
     new THREE.Vector3(10, 120, -1900), F.end.p.clone().addScaledVector(F.f, 150).addScaledVector(F.right, F.portrait ? -25 : -60).addScaledVector(F.up, F.portrait ? -45 : -38),
-    F.end.p.clone().addScaledVector(F.f, 105).addScaledVector(F.right, F.portrait ? -8 : 12).addScaledVector(F.up, F.portrait ? 0 : -8), F.at.clone()], false, 'centripetal');
-  trail.geometry.dispose(); trail.geometry = new THREE.TubeGeometry(route, 900, 0.2, 8, false); trail.visible = true; trail.material.uniforms.r.value = 0;
+    F.end.p.clone().addScaledVector(F.f, 420).addScaledVector(F.right, 25).addScaledVector(F.up, 70), F.end.p.clone().addScaledVector(F.f, 1300).addScaledVector(F.right, 70).addScaledVector(F.up, 300), F.end.p.clone().addScaledVector(F.f, 3200).addScaledVector(F.right, 140).addScaledVector(F.up, 820)], false, 'centripetal');
+  trail.geometry.dispose(); trail.geometry = new THREE.TubeGeometry(route, 900, 0.2, 8, false); trail.visible = true; trail.material.uniforms.r.value = 0; trail.material.uniforms.dim.value = 1;
   panel.position.copy(F.at); panel.lookAt(F.end.p); if (!F.portrait) panel.rotateY(-0.3); panel.userData.y0 = panel.position.y; panel.scale.setScalar(0.001);
   fx = { t0: performance.now() / 1000, camFrom: cam.position.clone(), lookFrom: rig.look.clone(), route, F, o0: cam.position.clone().sub(start), o1: F.end.p.clone().sub(F.at), T: reduce ? 8 : 16, preview };
 }
@@ -517,7 +517,7 @@ function tickLaunch(now) {
   // camera: dalla posizione a terra passa all'inseguimento; la distanza cresce con la velocità; all'arrivo si mette nell'inquadratura finale
   const aim = _w.set(0, -260, -5000), away = _v.copy(pos).sub(aim).normalize();
   const D = 26 + 40 * smooth(u * 3), chase = pos.clone().addScaledVector(away, D).add(new THREE.Vector3(0, 4 + 6 * smooth(u * 3), 0));
-  const fin = smooth((u - 0.68) / 0.32);
+  const fin = smooth((u - 0.5) / 0.22);
   chase.lerp(fx.F.end.p, fin);
   const k = smooth((t - 1.9) / 3.2);
   cam.position.copy(fx.camFrom).lerp(chase, k);
@@ -529,24 +529,23 @@ function tickLaunch(now) {
   if (u > 0.55 && lab.lab.visible) lab.lab.visible = false;
   // il razzo arriva e diventa il sito in orbita
   if (u >= 1 && !fx.arrived) {
-    fx.arrived = now; say(null); flash(now);
+    fx.arrived = now; say(null);
     if (fx.preview) { setTimeout(() => showFinal(true), reduce ? 200 : 900); setTimeout(() => { if (store.state === 'PREVIEW_FLIGHT') { hideFinal(); conf.proposal(); } }, reduce ? 2500 : 7500); }
     else { store.go('ORBIT'); setTimeout(() => showFinal(false), reduce ? 200 : 900); }
   }
-  if (fx.arrived) {
-    const d = now - fx.arrived, s = smooth(d / 1.2);
-    R.scale.setScalar(Math.max(0.001, 1 - s)); panel.visible = true; panel.scale.setScalar(0.001 + smooth((d - 0.3) / 1.6));
-    panel.position.y = panel.userData.y0 + Math.sin(now * 0.7) * 0.5; panel.rotation.z = Math.sin(now * 0.4) * 0.015;
-    if (d > 1.3) R.visible = false;
-  }
-  const fl = fx.flashT ? now - fx.flashT : 9; comet.visible = fl < 1.6; if (comet.visible) { comet.position.copy(panel.position); comet.scale.setScalar(6 + fl * 22); comet.material.opacity = Math.pow(1 - fl / 1.6, 2); }
+  // il razzo si allontana e svanisce nello spazio
+  R.visible = u < 0.99; R.scale.setScalar(1 + 2.5 * smooth((u - 0.6) / 0.4)); // da lontano resta visibile come un punto di luce fino all'ultimo
+  if (fx.arrived) trail.material.uniforms.dim.value = Math.max(0.45, 1 - (now - fx.arrived) * 0.3);
+  // il bagliore del motore: da lontano il razzo resta un punto di luce che sale e si spegne
+  comet.visible = t > 1.7 && u < 0.995;
+  if (comet.visible) { comet.position.copy(R.position).addScaledVector(tan, -1.5); const dist = cam.position.distanceTo(R.position); comet.scale.setScalar(Math.max(4, dist * 0.035)); comet.material.opacity = 0.9 * (1 - smooth((u - 0.93) / 0.065)); }
 }
 // dopo l'arrivo non si sta fermi: la camera continua a scivolare in orbita
 const drift = (d) => (reduce ? new THREE.Vector3() : new THREE.Vector3(Math.sin(d * 0.05) * 16, Math.sin(d * 0.07) * 5, -Math.sin(d * 0.035) * 22));
 function flash(now) { fx.flashT = now; sound.chime(660); }
 function showFinal(preview) {
   renderer.setClearColor(0x000000);
-  ui.final.querySelector('.orbit-title').innerHTML = preview ? 'IL TUO SITO<br>È PRONTO PER L\'<span class="hl">ORBITA.</span>' : 'IL TUO SITO<br>È IN <span class="hl">ORBITA.</span>';
+  ui.final.querySelector('.orbit-title').innerHTML = 'IL TUO SITO<br>È IN <span class="hl">ORBITA.</span>';
   for (const el of ui.final.querySelectorAll('.orbit-brand, .orbit-claim')) el.textContent = el.textContent;
   ui.final.querySelector('.demo')?.remove(); $('#again').hidden = !!preview;
   // ogni lettera entra da sola, poi il blocco galleggia
