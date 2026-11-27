@@ -6,31 +6,239 @@
   "depositPercent": 40,
   "contactEmail": "",
   "packages": {
-    "start":    { "name": "Start",     "price": 890,  "from": false, "desc": "Sito con una lingua a scelta" },
-    "business": { "name": "Business",  "price": 1290, "from": false, "desc": "Per aziende che vogliono crescere" },
-    "premium":  { "name": "Premium",   "price": 2490, "from": true,  "desc": "Lingue illimitate" },
-    "custom":   { "name": "Su misura", "price": null, "from": false, "desc": "Progetti speciali" }
+    "start": {
+      "name": "Start",
+      "price": 890,
+      "from": false,
+      "desc": "Sito con una lingua a scelta"
+    },
+    "business": {
+      "name": "Business",
+      "price": 1290,
+      "from": false,
+      "desc": "Per aziende che vogliono crescere"
+    },
+    "premium": {
+      "name": "Premium",
+      "price": 2490,
+      "from": true,
+      "desc": "Lingue illimitate"
+    },
+    "custom": {
+      "name": "Su misura",
+      "price": null,
+      "from": false,
+      "desc": "Progetti speciali"
+    }
   },
+  "_featuresNote": "BOZZA DA CONFERMARE: quali funzionalità appartengono a quale pacchetto. Il selettore consiglia il pacchetto più basso che le include tutte. Correggere 'pkg' qui (start, business, premium, custom).",
+  "featuresDraft": true,
+  "sectors": [
+    "Ristorante / bar",
+    "Negozio",
+    "Studio / professionista",
+    "Hotel / turismo",
+    "Salute / benessere",
+    "Artigiano / servizi",
+    "Altro"
+  ],
+  "features": [
+    {
+      "id": "pages",
+      "label": "Sito vetrina",
+      "sub": "Le pagine essenziali",
+      "pkg": "start"
+    },
+    {
+      "id": "contact",
+      "label": "Modulo contatti",
+      "sub": "I clienti ti scrivono dal sito",
+      "pkg": "start"
+    },
+    {
+      "id": "map",
+      "label": "Mappa e indicazioni",
+      "sub": "Ti trovano subito",
+      "pkg": "start"
+    },
+    {
+      "id": "whatsapp",
+      "label": "Pulsante WhatsApp",
+      "sub": "Un tocco e ti scrivono",
+      "pkg": "start"
+    },
+    {
+      "id": "blog",
+      "label": "Blog / novità",
+      "sub": "Racconti cosa succede",
+      "pkg": "business"
+    },
+    {
+      "id": "booking",
+      "label": "Prenotazioni online",
+      "sub": "Prenotano da soli, 24 ore su 24",
+      "pkg": "business"
+    },
+    {
+      "id": "seo",
+      "label": "SEO locale",
+      "sub": "Ti trovano su Google",
+      "pkg": "business"
+    },
+    {
+      "id": "gallery",
+      "label": "Galleria / portfolio",
+      "sub": "Mostri i tuoi lavori",
+      "pkg": "business"
+    },
+    {
+      "id": "langs",
+      "label": "Più lingue",
+      "sub": "Lingue illimitate",
+      "pkg": "premium"
+    },
+    {
+      "id": "shop",
+      "label": "Shop online",
+      "sub": "Vendi i tuoi prodotti",
+      "pkg": "premium"
+    },
+    {
+      "id": "payments",
+      "label": "Pagamenti online",
+      "sub": "Carta e TWINT",
+      "pkg": "premium"
+    },
+    {
+      "id": "login",
+      "label": "Area clienti",
+      "sub": "Accesso con login",
+      "pkg": "premium"
+    },
+    {
+      "id": "integrations",
+      "label": "Integrazione gestionali",
+      "sub": "Il sito parla con i tuoi sistemi",
+      "pkg": "custom"
+    },
+    {
+      "id": "customfx",
+      "label": "Funzioni su misura",
+      "sub": "Quello che ancora non esiste",
+      "pkg": "custom"
+    },
+    {
+      "id": "app",
+      "label": "App / web app",
+      "sub": "Il tuo business in tasca",
+      "pkg": "custom"
+    }
+  ],
   "slotsAreDemo": true,
   "slots": {
     "start": [
-      { "id": "S01", "status": "occupied" }, { "id": "S02", "status": "free", "start": "2026-12-08", "online": "2026-12-20" },
-      { "id": "S03", "status": "occupied" }, { "id": "S04", "status": "free", "start": "2026-12-15", "online": "2027-01-08" },
-      { "id": "S05", "status": "occupied" }, { "id": "S06", "status": "occupied" },
-      { "id": "S07", "status": "free", "start": "2027-01-12", "online": "2027-01-26" }, { "id": "S08", "status": "occupied" }
+      {
+        "id": "S01",
+        "status": "occupied"
+      },
+      {
+        "id": "S02",
+        "status": "free",
+        "start": "2026-12-08",
+        "online": "2026-12-20"
+      },
+      {
+        "id": "S03",
+        "status": "occupied"
+      },
+      {
+        "id": "S04",
+        "status": "free",
+        "start": "2026-12-15",
+        "online": "2027-01-08"
+      },
+      {
+        "id": "S05",
+        "status": "occupied"
+      },
+      {
+        "id": "S06",
+        "status": "occupied"
+      },
+      {
+        "id": "S07",
+        "status": "free",
+        "start": "2027-01-12",
+        "online": "2027-01-26"
+      },
+      {
+        "id": "S08",
+        "status": "occupied"
+      }
     ],
     "business": [
-      { "id": "B01", "status": "occupied" }, { "id": "B02", "status": "free", "start": "2026-12-09", "online": "2026-12-23" },
-      { "id": "B03", "status": "occupied" }, { "id": "B04", "status": "free", "start": "2027-01-12", "online": "2027-01-30" },
-      { "id": "B05", "status": "occupied" }, { "id": "B06", "status": "occupied" }
+      {
+        "id": "B01",
+        "status": "occupied"
+      },
+      {
+        "id": "B02",
+        "status": "free",
+        "start": "2026-12-09",
+        "online": "2026-12-23"
+      },
+      {
+        "id": "B03",
+        "status": "occupied"
+      },
+      {
+        "id": "B04",
+        "status": "free",
+        "start": "2027-01-12",
+        "online": "2027-01-30"
+      },
+      {
+        "id": "B05",
+        "status": "occupied"
+      },
+      {
+        "id": "B06",
+        "status": "occupied"
+      }
     ],
     "premium": [
-      { "id": "P01", "status": "occupied" }, { "id": "P02", "status": "free", "start": "2026-12-14", "online": "2027-01-15" },
-      { "id": "P03", "status": "free", "start": "2027-01-18", "online": "2027-02-19" }, { "id": "P04", "status": "occupied" }
+      {
+        "id": "P01",
+        "status": "occupied"
+      },
+      {
+        "id": "P02",
+        "status": "free",
+        "start": "2026-12-14",
+        "online": "2027-01-15"
+      },
+      {
+        "id": "P03",
+        "status": "free",
+        "start": "2027-01-18",
+        "online": "2027-02-19"
+      },
+      {
+        "id": "P04",
+        "status": "occupied"
+      }
     ],
     "custom": [
-      { "id": "X01", "status": "free", "start": "su appuntamento", "online": "da definire insieme" },
-      { "id": "X02", "status": "occupied" }
+      {
+        "id": "X01",
+        "status": "free",
+        "start": "su appuntamento",
+        "online": "da definire insieme"
+      },
+      {
+        "id": "X02",
+        "status": "occupied"
+      }
     ]
   }
 }

@@ -10,6 +10,7 @@ import { buildV, buildTunnel } from './vgeometry.js';
 import { LAB, EARTH, SUN_DIR, R_LAB, DEPTS, canvasTex, siteScreen, makeEnvironment, makeMaterials, buildSpace, buildMoon, buildLab, buildCards, buildRocket } from './world.js';
 import { CameraRig } from './camera.js';
 import { Sound } from './audio.js';
+import { configurator } from './configurator.js';
 
 const $ = (s) => document.querySelector(s);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -28,8 +29,9 @@ const FLOW = {
   INITIAL: ['INTRO', 'LAUNCH'],
   INTRO: ['PORTAL', 'LAB_EXTERIOR'],
   PORTAL: ['LAB_EXTERIOR'],
-  LAB_EXTERIOR: ['DEPARTMENT_SELECTION'],
-  DEPARTMENT_SELECTION: ['DEPARTMENT_INTERIOR'],
+  LAB_EXTERIOR: ['FEATURE_SELECTION', 'DEPARTMENT_SELECTION'],
+  FEATURE_SELECTION: ['DEPARTMENT_SELECTION', 'DEPARTMENT_INTERIOR'],
+  DEPARTMENT_SELECTION: ['DEPARTMENT_INTERIOR', 'FEATURE_SELECTION'],
   DEPARTMENT_INTERIOR: ['WORKSTATION_SELECTION', 'DEPARTMENT_SELECTION'],
   WORKSTATION_SELECTION: ['BOARDING_PASS', 'DEPARTMENT_SELECTION', 'DEPARTMENT_INTERIOR'],
   BOARDING_PASS: ['PAYMENT', 'WORKSTATION_SELECTION', 'DEPARTMENT_INTERIOR'],
@@ -281,13 +283,22 @@ addEventListener('touchmove', (e) => { if (store.state === 'INTRO' && ty - e.tou
 // 4 - i quattro reparti
 const LOBBY = () => P(L(0, 2.25, 8.4), L(0, 1.7, 2.0), 50);
 function toLobby() {
-  store.go('DEPARTMENT_SELECTION');
-  rig.fly(LOBBY(), { dur: 5.2, via: [L(0, 9, 36), L(0, 3.2, R_LAB + 3.5), L(0, 2.4, R_LAB - 2.5)], lookVia: [L(0, 2.8, R_LAB), L(0, 2, 6)], onDone: lobbyReady });
+  store.go('FEATURE_SELECTION');
+  rig.fly(LOBBY(), { dur: 5.2, via: [L(0, 9, 36), L(0, 3.2, R_LAB + 3.5), L(0, 2.4, R_LAB - 2.5)], lookVia: [L(0, 2.8, R_LAB), L(0, 2, 6)], onDone: () => conf.open() });
   showCards(true);
 }
+// 4a - il configuratore: cosa serve al tuo business
+const conf = configurator({
+  cfg, slots, slotsAreDemo, fmt,
+  onRecommend: (k) => { glow.card = k; },
+  onGo: (k, req) => { store.ctx.request = req; conf.close(); openDept(k); },
+  onSkip: () => { store.ctx.request = conf.summary(); conf.close(); if (store.go('DEPARTMENT_SELECTION')) lobbyReady(); },
+});
+function openConfig() { if (!store.go('FEATURE_SELECTION')) return; picks = []; dock(null); say(null); tagAt(null); conf.open(); }
 function lobbyReady() {
   say('Scegli il tuo reparto.');
   const items = KEYS.map((k) => ({ html: `${cfg.packages[k].name} <small>${cfg.packages[k].priceLabel}</small>`, label: `${cfg.packages[k].name}, ${cfg.packages[k].priceLabel}: ${cfg.packages[k].desc}`, on: () => openDept(k), hover: (v) => hoverCard(k, v) }));
+  items.push({ html: 'Le tue funzionalità', cls: 'back', on: openConfig });
   dock(items);
   picks = KEYS.map((k) => ({ obj: cards[k].hit, on: () => openDept(k), hover: (v) => hoverCard(k, v) }));
 }
@@ -311,7 +322,7 @@ function openDept(k) {
   picks = []; dock(null); say(null); tagAt(null); passOff(); resetSeat(); sound.whoosh();
   glow.dept = k; showCards(false);
   const to = deptPose(k), mid = (DEPTS[k].phi[0] + DEPTS[k].phi[1]) / 2;
-  const via = from === 'DEPARTMENT_SELECTION' ? [L(0, 3.4, 5.2), polar(2.2, mid, 3.6).add(LAB)] : [polar(4.5, mid + 25, 3.3).add(LAB), L(0, 3.8, 0)];
+  const via = from === 'DEPARTMENT_SELECTION' || from === 'FEATURE_SELECTION' ? [L(0, 3.4, 5.2), polar(2.2, mid, 3.6).add(LAB)] : [polar(4.5, mid + 25, 3.3).add(LAB), L(0, 3.8, 0)];
   rig.fly(to, { dur: 3.6, via, onDone: () => seatsReady(k) });
 }
 let seatFocus = null;
@@ -355,6 +366,8 @@ function passOn() {
   $('#fPrice').textContent = p.priceLabel;
   const dep = deposit(p); $('#fDeposit').textContent = dep == null ? '—' : `${p.from ? 'Da ' : ''}CHF ${fmt(dep)}`;
   $('#demoNote').hidden = !slotsAreDemo;
+  const req = store.ctx.request, fl = req?.features?.map((id) => cfg.features.find((f) => f.id === id)?.label).filter(Boolean) || [];
+  $('#fFeat').hidden = !fl.length; $('#fFeat').textContent = fl.length ? `Il tuo sito: ${fl.join(' · ')}` : '';
   $('#passShot').src = siteScreen(DEPTS[k].color.getStyle(), 'Il tuo sito').image.toDataURL();
   const go = $('#go');
   go.querySelector('.t span').textContent = p.price == null ? 'Richiedi un incontro' : 'Prendi il volo';
@@ -404,7 +417,7 @@ addEventListener('keydown', (e) => {
 async function checkout() {
   const btn = $('#payGo'); btn.disabled = true; $('#payFine').textContent = 'Verifica della disponibilità…';
   try {
-    const r = await fetch(`${cfg.api}/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dept: store.ctx.dept, slotId: store.ctx.slot.id }) });
+    const r = await fetch(`${cfg.api}/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dept: store.ctx.dept, slotId: store.ctx.slot.id, features: store.ctx.request?.features || [], sector: store.ctx.request?.sector || '' }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.url) throw new Error(j.error || 'Pagamento non disponibile in questo momento.');
     location.href = j.url; // pagina Stripe; il ritorno porta ?session_id=…

@@ -28,6 +28,18 @@
 
 <nav id="dock" aria-label="Scelte"></nav>
 
+<section id="cfg" aria-label="Configura il tuo sito" hidden>
+  <div class="cfg-main">
+    <div class="cfg-top"><div class="cfg-steps"></div><button class="lnk" type="button" data-skip>Scegli tu il reparto</button></div>
+    <div class="cfg-scroll"><div class="cfg-body"></div></div>
+  </div>
+  <div class="cfg-preview" aria-hidden="true"></div>
+</section>
+<!-- modulo per Netlify Forms: serve solo a farlo riconoscere al deploy; l'invio vero avviene dal configuratore -->
+<form name="configuratore" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <input name="sector"><input name="business"><input name="name"><input name="email"><input name="phone"><textarea name="notes"></textarea><input name="features"><input name="package"><input name="consent"><input name="bot-field">
+</form>
+
 <section id="pass" aria-label="Carta d'imbarco" hidden>
   <div class="pass-top"><span class="pass-brand"><svg viewBox="0 0 1700 1900" width="26" height="29" aria-hidden="true"><path d="M65 278H497L845 1180L1193 278H1625L1029 1822H662Z" fill="url(#lg)"/></svg><span>VITRALIA<small>WEB STUDIO</small></span></span><span class="pass-kind">CARTA D'IMBARCO <svg class="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4L3 11l7 2 2 7z"/><path d="M10 13l11-9"/></svg></span></div>
   <div class="route"><div><b>OFF</b><small>Il tuo business oggi</small></div><i><span></span><svg class="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4L3 11l7 2 2 7z"/><path d="M10 13l11-9"/></svg></i><div class="r"><b class="to">TOP</b><small>Online, trovato, scelto</small></div></div>
@@ -42,6 +54,7 @@
     </dl>
     <figure class="laptop" aria-hidden="true"><div class="lid"><img id="passShot" alt=""></div><div class="kb"></div></figure>
   </div>
+  <p class="feat-note" id="fFeat" hidden></p>
   <p class="demo-note" id="demoNote" hidden>Postazioni e date dimostrative.</p>
   <div class="acts">
     <button class="btn" id="go" type="button"><svg class="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4L3 11l7 2 2 7z"/><path d="M10 13l11-9"/></svg><span class="t"><span>Prendi il volo</span><small>Paga l'acconto e avvia il tuo progetto</small></span></button>

@@ -6,6 +6,9 @@ export default async (req) => {
   if (catalog.mode !== 'live') return json(403, { error: 'Pagamenti non attivi (modalità demo).' });
   let body; try { body = await req.json(); } catch { return json(400, { error: 'Richiesta non valida' }); }
   const { dept, slotId } = body || {};
+  const known = new Set((catalog.features || []).map((f) => f.id));
+  const features = (Array.isArray(body?.features) ? body.features : []).filter((f) => known.has(f)).join(',').slice(0, 450);
+  const sector = typeof body?.sector === 'string' ? body.sector.slice(0, 100) : '';
   const pkg = catalog.packages[dept];
   if (!pkg || pkg.price == null) return json(400, { error: 'Questo reparto non prevede pagamento online.' });
   const st = await slotState(dept, slotId);
@@ -24,7 +27,7 @@ export default async (req) => {
       'line_items[0][price_data][currency]': catalog.currency.toLowerCase(),
       'line_items[0][price_data][unit_amount]': String(dep * 100),
       'line_items[0][price_data][product_data][name]': `Acconto ${catalog.depositPercent}% · ${pkg.name} · postazione ${slotId}`,
-      'metadata[dept]': dept, 'metadata[slotId]': slotId,
+      'metadata[dept]': dept, 'metadata[slotId]': slotId, 'metadata[features]': features, 'metadata[sector]': sector,
       'payment_intent_data[metadata][dept]': dept, 'payment_intent_data[metadata][slotId]': slotId,
       expires_at: String(Math.floor(expires / 1000)),
       success_url: `${site}/?session_id={CHECKOUT_SESSION_ID}`,

@@ -60,3 +60,13 @@ Il passaggio a `LAUNCH` viene rifiutato se il pagamento non è confermato. L'uni
 ## Anteprima del lancio
 
 In modalità demo, `/?scena=lancio` porta subito al decollo: serve per test e presentazioni.
+
+## Configuratore (prima dei reparti)
+
+Nell'atrio del laboratorio il cliente indica settore e nome dell'attività, accende le funzionalità che gli servono e vede un'anteprima del suo sito che prende forma. Il pacchetto consigliato è il più basso che include tutte le funzionalità scelte (`js/configurator.js`).
+
+- **Funzionalità e pacchetti:** in `data/config.json` → `features` (campo `pkg`). **È una bozza da confermare** (`featuresDraft: true`, mostra la nota "Elenco funzionalità in bozza").
+- **Dati del cliente:** inviati con Netlify Forms, modulo `configuratore` (settore, attività, nome, email, telefono, note, funzionalità, pacchetto). Li trovi in Netlify, alla voce Forms. Per riceverli via email: Forms → Form notifications → Add notification → Email notification.
+- Il rilevamento dei moduli deve essere attivo (Forms → Form detection → Enable).
+- Con i pagamenti attivi, funzionalità e settore viaggiano anche nei metadati della sessione Stripe. Il prezzo resta calcolato sul server.
+- Manca un'informativa sulla privacy da collegare al consenso.
