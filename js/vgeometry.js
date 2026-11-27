@@ -40,10 +40,10 @@ export function inset(pts, d) {
 const shapeOf = (pts) => { const s = new THREE.Shape(); pts.forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y))); s.closePath(); return s; };
 
 // tubo lungo un contorno, colorato con il gradiente del logo da sinistra (blu) a destra (verde acqua)
-function edgeTube(pts, r, z, xMin, xMax) {
+function edgeTube(pts, r, z, xMin, xMax, closed = true) {
   const path = new THREE.CurvePath();
-  for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; path.add(new THREE.LineCurve3(new THREE.Vector3(a[0], a[1], z), new THREE.Vector3(b[0], b[1], z))); }
-  const g = new THREE.TubeGeometry(path, pts.length * 20, r, 8, true);
+  for (let i = 0; i < (closed ? pts.length : pts.length - 1); i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; path.add(new THREE.LineCurve3(new THREE.Vector3(a[0], a[1], z), new THREE.Vector3(b[0], b[1], z))); }
+  const g = new THREE.TubeGeometry(path, pts.length * 20, r, 8, closed);
   const pos = g.attributes.position, col = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) { const c = logoGradient((pos.getX(i) - xMin) / (xMax - xMin)); col.set([c.r, c.g, c.b], i * 3); }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -72,9 +72,9 @@ export function buildV({ glass, depth = 14, tunnel = 0, spacing = 8, scale = 1, 
   const layerZ = (s) => -depth * (1 / s - 1) - 0.4;
   const fills = [];
   V_LAYER_SCALES.forEach((s, i) => {
-    const pts = scaled(V_LAYER, 1).map(toUnits); // stessa dimensione fisica: è la prospettiva a rimpicciolirli
+    const clip = layerClipped(s), pts = clip.fill.map(toUnits); // stessa dimensione fisica: è la prospettiva a rimpicciolirli
     const z = layerZ(s);
-    tubes.push(edgeTube(pts, edgeR * (1.1 + i * 0.12), z, xMin, xMax));
+    tubes.push(edgeTube(clip.edge.map(toUnits), edgeR * (1.1 + i * 0.12), z, xMin, xMax, false));
     const f = new THREE.Mesh(new THREE.ShapeGeometry(shapeOf(pts)), new THREE.MeshBasicMaterial({ color: C.navy, transparent: true, opacity: V_DARK[i], depthWrite: false, side: THREE.DoubleSide }));
     f.position.z = z; f.renderOrder = 2; f.userData.baseOpacity = V_DARK[i]; fills.push(f); g.add(f);
   });
@@ -95,6 +95,19 @@ export function buildV({ glass, depth = 14, tunnel = 0, spacing = 8, scale = 1, 
   g.scale.setScalar(scale);
   g.userData = { body, fills, core, coreZ, frames, length: -coreZ + tunnel * spacing, xMin, xMax };
   return g;
+}
+
+// Nel logo gli strati esistono solo dentro la V: tra i due bracci (la tacca) non ci sono.
+// Lo strato è disegnato in grandezza piena e rimpicciolito dalla prospettiva di un fattore s,
+// quindi nel suo piano la tacca va ingrandita di 1/s attorno al centro di convergenza.
+const NOTCH = [[497, 278], [845, 1180], [1193, 278]];
+function layerClipped(s) {
+  const [TL, TR, BR, BL] = V_LAYER, n = NOTCH.map(([x, y]) => [V_ANCHOR[0] + (x - V_ANCHOR[0]) / s, V_ANCHOR[1] + (y - V_ANCHOR[1]) / s]);
+  const tip = n[1], yTop = TL[1];
+  if (tip[1] <= yTop) return { fill: V_LAYER, edge: [...V_LAYER, TL] };
+  const at = (a, b) => [a[0] + (b[0] - a[0]) * ((yTop - a[1]) / (b[1] - a[1])), yTop];
+  const A = at(n[0], tip), B = at(n[2], tip);
+  return { fill: [TL, A, tip, B, TR, BR, BL], edge: [A, TL, BL, BR, TR, B] };
 }
 
 // Solo la sagoma piatta della V (per insegne e dettagli architettonici), stessa geometria.
