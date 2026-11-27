@@ -14,7 +14,7 @@ const HERO = {
   'Artigiano / servizi': ['Lavori fatti a regola d\'arte', 'Richiedi un preventivo'],
   Altro: ['Benvenuti', 'Scopri di più'],
 };
-const ICON = {
+export const ICON = {
   pages: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   contact: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
   map: '<path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>',
@@ -33,10 +33,11 @@ const ICON = {
 };
 const svg = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k] || ICON.pages}</svg>`;
 
-export function configurator({ cfg, slots, slotsAreDemo, onGo, onSkip, onRecommend, fmt }) {
+export function configurator(opts) {
+  const { cfg, slots, slotsAreDemo, onGo, onSkip, onRecommend } = opts;
   const root = document.querySelector('#cfg');
   const F = cfg.features || [], P = cfg.packages;
-  const st = { step: 0, sector: '', business: '', on: new Set(['pages', 'contact']), sent: false };
+  const st = { mode: 'intro', room: 0, sector: '', business: '', on: new Set(), sent: false };
   const freeCount = (k) => (slots[k] || []).filter((s) => s.status === 'free').length;
 
   const recommend = () => { let r = 0; for (const id of st.on) { const f = F.find((x) => x.id === id); if (f) r = Math.max(r, RANK[f.pkg] ?? 0); } return KEYS[r]; };
@@ -67,32 +68,44 @@ export function configurator({ cfg, slots, slotsAreDemo, onGo, onSkip, onRecomme
       ${on('app') ? `<div class="pv-phone"><div><b>${name}</b><span></span><span></span></div></div>` : ''}`;
   }
 
-  // ---------- passi ----------
-  function render() {
+  // ---------- modi: intro (atrio), room (le sale), final (assemblaggio e proposta) ----------
+  const ROOM = opts.rooms, ORDER = opts.order;
+  const roomFeats = (k) => F.filter((f) => f.pkg === k);
+  const recBox = (compact) => {
     const rec = recommend(), p = P[rec], free = freeCount(rec);
-    const steps = ['La tua attività', 'Il tuo sito', 'La tua proposta'];
-    let body = '';
-    if (st.step === 0) {
-      body = `<h2>Che attività hai?</h2><p class="cfg-sub">Costruiamo insieme l'anteprima del tuo sito.</p>
-        <div class="chips">${cfg.sectors.map((s) => `<button type="button" class="chip${st.sector === s ? ' on' : ''}" data-sector="${esc(s)}">${esc(s)}</button>`).join('')}</div>
+    return `<div class="rec${compact ? ' compact' : ''}" data-rec="${rec}"><div><small>Pacchetto consigliato</small><b>${esc(p.name)} <span>${esc(p.priceLabel)}</span></b>
+      ${!compact ? `<small class="why">${rec === 'start' ? 'Tutto quello che hai scelto è incluso.' : `Per ${esc(needs(rec).join(', '))}`}</small>` : ''}
+      ${rec !== 'custom' ? `<small class="avail">${free ? `${free} ${free === 1 ? 'postazione libera' : 'postazioni libere'}${slotsAreDemo ? ' (dati dimostrativi)' : ''}` : 'Nessuna postazione libera al momento'}</small>` : ''}</div>
+      ${compact && rec !== 'start' ? `<button class="pill up" type="button" data-final>Scegli ${esc(p.name)}</button>` : ''}</div>`;
+  };
+  function render() {
+    root.dataset.mode = st.mode;
+    const body = root.querySelector('.cfg-body'), steps = root.querySelector('.cfg-steps');
+    if (st.mode === 'intro') {
+      steps.innerHTML = '<span class="on">La tua attività</span>';
+      body.innerHTML = `<h2>Che attività hai?</h2><p class="cfg-sub">Poi visitiamo le sale del laboratorio: in ognuna si prepara un pezzo del tuo sito.</p>
+        <div class="chips">${cfg.sectors.map((s, i) => `<button type="button" class="chip${st.sector === s ? ' on' : ''}" style="--i:${i}" data-sector="${esc(s)}">${esc(s)}</button>`).join('')}</div>
         <label class="fld"><span>Nome dell'attività</span><input id="cfgBiz" type="text" maxlength="60" autocomplete="organization" placeholder="Es. Caffè Lago" value="${esc(st.business)}"></label>
-        <div class="cfg-acts"><button class="btn" type="button" data-go="1" ${st.sector ? '' : 'disabled'}><span class="t"><span>Avanti</span></span></button></div>`;
-    } else if (st.step === 1) {
-      body = `<h2>Cosa deve fare il tuo sito?</h2><p class="cfg-sub">Accendi le funzioni: il tuo sito prende forma qui accanto.</p>
-        <div class="feats">${F.map((f) => `<button type="button" class="feat${st.on.has(f.id) ? ' on' : ''}" data-f="${f.id}" aria-pressed="${st.on.has(f.id)}">${svg(f.id)}<span><b>${esc(f.label)}</b><small>${esc(f.sub)}</small></span><em class="tag-${f.pkg}">${esc(P[f.pkg].name)}</em></button>`).join('')}</div>
-        <div class="rec">
-          <div><small>Pacchetto consigliato</small><b>${esc(p.name)} <span>${esc(p.priceLabel)}</span></b>
-            <small class="why">${rec === 'start' ? 'Tutto quello che hai scelto è incluso.' : `Per ${esc(needs(rec).join(', '))}`}</small>
-            ${rec !== 'custom' ? `<small class="avail">${free ? `${free} ${free === 1 ? 'postazione libera' : 'postazioni libere'} in questo reparto${slotsAreDemo ? ' (dati dimostrativi)' : ''}` : 'Nessuna postazione libera al momento'}</small>` : ''}</div>
-          <button class="btn" type="button" data-go="2"><span class="t"><span>${rec === 'start' ? 'Continua' : `Scegli ${esc(p.name)}`}</span><small>${rec === 'start' ? 'Ricevi la tua proposta' : 'Il pacchetto giusto per quello che vuoi'}</small></span></button>
-        </div>
+        <div class="cfg-acts"><button class="btn" type="button" data-room="0" ${st.sector ? '' : 'disabled'}><span class="t"><span>Visita le sale</span><small>${ORDER.length} sale, un pezzo del sito in ognuna</small></span></button></div>`;
+    } else if (st.mode === 'room') {
+      const k = ORDER[st.room], r = ROOM[k], list = roomFeats(k), last = st.room === ORDER.length - 1;
+      steps.innerHTML = ORDER.map((x, i) => `<button type="button" class="dot${i === st.room ? ' on' : ''}${i < st.room ? ' done' : ''}" data-room="${i}" aria-label="${esc(ROOM[x].name)}"></button>`).join('');
+      body.innerHTML = `<div class="room-head" key="${k}"><small>Sala ${st.room + 1} di ${ORDER.length} · reparto ${esc(P[k].name)}</small><h2>${esc(r.name)}</h2><p class="cfg-sub">${esc(r.sub)}. Accendi quello che ti serve.</p></div>
+        <div class="feats room">${list.map((f, i) => `<button type="button" class="feat${st.on.has(f.id) ? ' on' : ''}" style="--i:${i}" data-f="${f.id}" aria-pressed="${st.on.has(f.id)}">${svg(f.id)}<span><b>${esc(f.label)}</b><small>${esc(f.sub)}</small></span><i class="sw" aria-hidden="true"></i></button>`).join('')}</div>
+        <div class="room-foot">${recBox(true)}<div class="nav">${st.room ? `<button class="pill" type="button" data-room="${st.room - 1}" aria-label="Sala precedente">←</button>` : ''}
+          <button class="btn" type="button" ${last ? 'data-final' : `data-room="${st.room + 1}"`}><span class="t"><span>${last ? 'Assembla il tuo sito' : esc(ROOM[ORDER[st.room + 1]].name)}</span><small>${last ? 'Tutti i pezzi nell\'atrio' : 'Sala successiva'}</small></span></button></div></div>
         ${cfg.featuresDraft ? '<p class="draft">Elenco funzionalità in bozza.</p>' : ''}`;
     } else {
-      body = st.sent
+      const rec = recommend(), p = P[rec];
+      steps.innerHTML = '<span class="on">Il tuo sito è pronto</span>';
+      body.innerHTML = st.sent
         ? `<h2>Grazie${st.name ? ', ' + esc(st.name.split(' ')[0]) : ''}.</h2><p class="cfg-sub">Abbiamo ricevuto la tua richiesta. Ora scegli la tua postazione nel reparto ${esc(p.name)}.</p>
            <div class="cfg-acts"><button class="btn" type="button" data-dept="${rec}"><span class="t"><span>Vai al reparto ${esc(p.name)}</span></span></button></div>`
-        : `<h2>Ricevi la tua proposta</h2><p class="cfg-sub">Ti scriviamo con la proposta per <b>${esc(st.business || 'la tua attività')}</b>: pacchetto ${esc(p.name)}, ${st.on.size} funzionalità.</p>
+        : `<h2>Il sito di ${esc(st.business || 'la tua attività')}</h2>
+        <div class="picked">${[...st.on].map((id, i) => `<span style="--i:${i}">${esc(F.find((f) => f.id === id)?.label || '')}</span>`).join('')}</div>
+        ${recBox(false)}
         <form id="cfgForm" class="form" novalidate>
+          <p class="cfg-sub">Ricevi la proposta per questo sito.</p>
           <label class="fld"><span>Nome e cognome</span><input name="name" required autocomplete="name" maxlength="80"></label>
           <label class="fld"><span>Email</span><input name="email" type="email" required autocomplete="email" maxlength="120"></label>
           <label class="fld"><span>Telefono <i>(facoltativo)</i></span><input name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
@@ -100,24 +113,41 @@ export function configurator({ cfg, slots, slotsAreDemo, onGo, onSkip, onRecomme
           <label class="ok"><input type="checkbox" name="consent" required> <span>Acconsento a essere ricontattato da Vitralia Web Studio per questa richiesta.</span></label>
           <p class="err" id="cfgErr" role="alert"></p>
           <div class="cfg-acts"><button class="btn" type="submit"><span class="t"><span>Invia e vai al reparto ${esc(p.name)}</span><small>Poi scegli la tua postazione</small></span></button></div>
-          <button class="lnk" type="button" data-dept="${rec}">Continua senza inviare</button>
+          <div class="cfg-links"><button class="lnk" type="button" data-dept="${rec}">Continua senza inviare</button><button class="lnk" type="button" data-room="0">Torna alle sale</button></div>
         </form>`;
     }
-    root.querySelector('.cfg-steps').innerHTML = steps.map((s, i) => `<span class="${i === st.step ? 'on' : i < st.step ? 'done' : ''}">${i + 1}. ${s}</span>`).join('');
-    root.querySelector('.cfg-body').innerHTML = body;
-    root.querySelector('.cfg-preview').innerHTML = preview();
-    onRecommend(st.step >= 1 ? rec : null);
+    root.querySelector('.cfg-preview').innerHTML = st.mode === 'final' ? preview() : '';
+    onRecommend(st.mode === 'intro' ? null : recommend());
+  }
+  function go(mode, room = st.room) {
+    const prevRec = recommend();
+    st.mode = mode; st.room = room;
+    root.classList.remove('on'); // dissolvenza tra un passo e l'altro, mentre la camera si sposta
+    setTimeout(() => { render(); requestAnimationFrame(() => root.classList.add('on')); root.querySelector('.cfg-scroll').scrollTop = 0; }, mode === 'final' ? (opts.reduce ? 900 : 4600) : 380); // nel finale prima si guarda l'assemblaggio
+    if (mode === 'room') opts.onRoom(ORDER[room], room);
+    if (mode === 'final') opts.onAssemble([...st.on], st.business);
+    return prevRec;
   }
 
   root.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.sector) { st.sector = b.dataset.sector; render(); return; }
-    if (b.dataset.f) { const id = b.dataset.f; st.on.has(id) ? st.on.delete(id) : st.on.add(id); render(); root.querySelector(`[data-f="${id}"]`)?.focus({ preventScroll: true }); return; }
-    if (b.dataset.go) { st.step = +b.dataset.go; render(); root.querySelector('.cfg-body h2')?.focus?.(); root.querySelector('.cfg-scroll').scrollTop = 0; return; }
+    if (b.dataset.f) { toggle(b.dataset.f); return; }
+    if (b.dataset.room !== undefined) { go('room', +b.dataset.room); return; }
+    if (b.dataset.final !== undefined) { go('final'); return; }
     if (b.dataset.dept) { onGo(b.dataset.dept, summary()); return; }
     if (b.dataset.skip !== undefined) { onSkip(); }
   });
-  root.addEventListener('input', (e) => { if (e.target.id === 'cfgBiz') { st.business = e.target.value; root.querySelector('.cfg-preview').innerHTML = preview(); } });
+  function toggle(id) {
+    const before = recommend(), on = !st.on.has(id);
+    on ? st.on.add(id) : st.on.delete(id);
+    opts.onToggle(id, on);
+    const btn = root.querySelector(`[data-f="${id}"]`); if (btn) { btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on); }
+    const foot = root.querySelector('.rec'); if (foot) { foot.outerHTML = recBox(foot.classList.contains('compact')); }
+    if (recommend() !== before) { const r = root.querySelector('.rec'); r?.classList.add('bump'); }
+    onRecommend(recommend());
+  }
+  root.addEventListener('input', (e) => { if (e.target.id === 'cfgBiz') st.business = e.target.value; });
   root.addEventListener('submit', async (e) => {
     e.preventDefault(); const f = e.target, err = root.querySelector('#cfgErr');
     if (!f.reportValidity()) return;
@@ -132,11 +162,18 @@ export function configurator({ cfg, slots, slotsAreDemo, onGo, onSkip, onRecomme
       btn.disabled = false; err.textContent = 'Invio non riuscito. Riprova tra poco, oppure continua senza inviare.';
     }
   });
+  opts.picker?.((id) => { if (st.mode === 'room' && F.find((f) => f.id === id)?.pkg === ORDER[st.room]) toggle(id); });
 
   const summary = () => ({ sector: st.sector, business: st.business, features: [...st.on], recommended: recommend(), sent: st.sent });
   return {
-    open() { root.hidden = false; render(); requestAnimationFrame(() => root.classList.add('on')); },
+    open(initial) {
+      root.hidden = false;
+      if (initial && !st.started) { st.started = true; for (const id of ['pages', 'contact']) { st.on.add(id); opts.onToggle(id, true, true); } }
+      if (st.mode === 'room') opts.onRoom(ORDER[st.room], st.room);
+      if (st.mode === 'final') opts.onAssemble([...st.on], st.business);
+      render(); requestAnimationFrame(() => root.classList.add('on'));
+    },
     close() { root.classList.remove('on'); root.hidden = true; onRecommend(null); },
-    summary,
+    summary, mode: () => st.mode,
   };
 }

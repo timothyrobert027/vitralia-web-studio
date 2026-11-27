@@ -11,6 +11,7 @@ import { LAB, EARTH, SUN_DIR, R_LAB, DEPTS, canvasTex, siteScreen, makeEnvironme
 import { CameraRig } from './camera.js';
 import { Sound } from './audio.js';
 import { configurator } from './configurator.js';
+import { buildRooms, ROOMS, ROOM_ORDER } from './rooms.js';
 
 const $ = (s) => document.querySelector(s);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -121,6 +122,7 @@ if (!mobile) Object.assign(mats.cardGlass, { color: new THREE.Color(0xd8fff8), a
 else Object.assign(mats.cardGlass, { color: new THREE.Color(0x1a2c52), opacity: 0.7 });
 const cards = buildCards(lab.lab, mats, cfg.packages);
 const rk = buildRocket(lab.lab, mats, mobile);
+const rooms = buildRooms({ lab: lab.lab, mats, features: cfg.features || [], seats: lab.seats, mobile });
 
 // La V: a 20 unità gli strati in profondità si sommano e ricompongono esattamente il logo.
 const V_DEPTH = 20, ANCHOR_Y = -(1271 - 1150) / 154.4; // asse di convergenza degli strati (vgeometry.js)
@@ -284,18 +286,34 @@ addEventListener('touchmove', (e) => { if (store.state === 'INTRO' && ty - e.tou
 const LOBBY = () => P(L(0, 2.25, 8.4), L(0, 1.7, 2.0), 50);
 function toLobby() {
   store.go('FEATURE_SELECTION');
-  rig.fly(LOBBY(), { dur: 5.2, via: [L(0, 9, 36), L(0, 3.2, R_LAB + 3.5), L(0, 2.4, R_LAB - 2.5)], lookVia: [L(0, 2.8, R_LAB), L(0, 2, 6)], onDone: () => conf.open() });
-  showCards(true);
+  rig.fly(LOBBY(), { dur: 5.2, via: [L(0, 9, 36), L(0, 3.2, R_LAB + 3.5), L(0, 2.4, R_LAB - 2.5)], lookVia: [L(0, 2.8, R_LAB), L(0, 2, 6)], onDone: () => conf.open(true) });
+  showCards(false);
 }
 // 4a - il configuratore: cosa serve al tuo business
+const portraitNow = () => innerWidth / innerHeight < 1;
+// la camera davanti alla postazione della sala: la lastra in alto, sotto il pannello delle scelte
+const roomPose = (k) => { const mid = rooms.midOf(k), pt = portraitNow(); return P(polar(pt ? 1.9 : 1.5, mid, pt ? 2.6 : 2.5).add(LAB), polar(6.9, mid, pt ? 0.35 : 1.35).add(LAB), 52); };
+let pickFn = null;
 const conf = configurator({
-  cfg, slots, slotsAreDemo, fmt,
+  cfg, slots, slotsAreDemo, fmt, reduce, rooms: ROOMS, order: ROOM_ORDER,
   onRecommend: (k) => { glow.card = k; },
-  onGo: (k, req) => { store.ctx.request = req; conf.close(); openDept(k); },
-  onSkip: () => { store.ctx.request = conf.summary(); conf.close(); if (store.go('DEPARTMENT_SELECTION')) lobbyReady(); },
+  onToggle: (id, on, silent) => { rooms.set(id, on, silent); if (on && !silent) sound.chime(1175); },
+  picker: (fn) => { pickFn = fn; },
+  onRoom: (k) => {
+    rooms.hideAssembly(); glow.dept = k; showCards(false); sound.whoosh();
+    picks = rooms.picks().filter((p) => rooms.tiles[p.id].k === k).map((p) => ({ obj: p.obj, on: () => pickFn?.(p.id) }));
+    rig.fly(roomPose(k), { dur: reduce ? 1.2 : 2.6, via: [L(0, 3.4, 1.5)] });
+  },
+  onAssemble: (ids, name) => {
+    picks = []; glow.dept = null; showCards(false); sound.whoosh();
+    rig.fly(P(L(0, 2.5, 10.5), L(0, 2.3, 2.0), 50), { dur: reduce ? 1 : 2.2, via: [L(0, 3.6, 4)], onDone: () => { rooms.assemble(ids, name); sound.chime(784); rig.fly(P(L(0, 2.35, 6.6), L(0, 2.3, 2.0), 50), { dur: 4 }); } });
+  },
+  onGo: (k, req) => { store.ctx.request = req; conf.close(); rooms.hideAssembly(); openDept(k); },
+  onSkip: () => { store.ctx.request = conf.summary(); conf.close(); rooms.hideAssembly(); glow.dept = null; if (store.go('DEPARTMENT_SELECTION')) { rig.fly(LOBBY(), { dur: 2.4, via: [L(0, 3.4, 4)], onDone: lobbyReady }); showCards(true); } },
 });
-function openConfig() { if (!store.go('FEATURE_SELECTION')) return; picks = []; dock(null); say(null); tagAt(null); conf.open(); }
+function openConfig() { if (!store.go('FEATURE_SELECTION')) return; picks = []; dock(null); say(null); tagAt(null); showCards(false); conf.open(); }
 function lobbyReady() {
+  showCards(true);
   say('Scegli il tuo reparto.');
   const items = KEYS.map((k) => ({ html: `${cfg.packages[k].name} <small>${cfg.packages[k].priceLabel}</small>`, label: `${cfg.packages[k].name}, ${cfg.packages[k].priceLabel}: ${cfg.packages[k].desc}`, on: () => openDept(k), hover: (v) => hoverCard(k, v) }));
   items.push({ html: 'Le tue funzionalità', cls: 'back', on: openConfig });
@@ -560,7 +578,7 @@ function frame() {
   } else for (const k of KEYS) for (const s of lab.seats[k]) if (s.halo.material.opacity) s.halo.material.opacity = 0;
   for (const w of lab.walkers) { const a = now * 0.18 + w.userData.ph; w.position.set(Math.cos(a) * 2.6, 0.31, Math.sin(a) * 2.6 - 1.8); w.rotation.y = -a; }
   space.earth.rotation.y += dt * 0.004; space.earth.userData.city.rotation.y = space.earth.rotation.y;
-  tickLaunch(now); dust.material.uniforms.cam.value.copy(cam.position); dust.material.uniforms.off.value += dt * (store.state === 'ORBIT' ? 6 : 0);
+  rooms.tick(dt, now); tickLaunch(now); dust.material.uniforms.cam.value.copy(cam.position); dust.material.uniforms.off.value += dt * (store.state === 'ORBIT' ? 6 : 0);
   if (ui.tag._w) placeTag();
   composer.render(dt);
   // qualità adattiva: se il dispositivo fatica, si riduce la risoluzione

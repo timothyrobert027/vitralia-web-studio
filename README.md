@@ -63,6 +63,14 @@ In modalità demo, `/?scena=lancio` porta subito al decollo: serve per test e pr
 
 ## Configuratore (prima dei reparti)
 
+Il configuratore è un giro per le **sale** del laboratorio (`js/rooms.js`). Ogni reparto ha una postazione di vetro dove si prepara un pezzo del sito:
+- Fondamenta (Start)
+- Visibilità (Business)
+- Espansione (Premium)
+- Su misura
+
+Quando il cliente accende una funzionalità, il pezzo parte da una scrivania della sala e vola al suo posto. Nel finale tutti i pezzi scelti volano nell'atrio e compongono il sito. La sala di ogni funzionalità è il suo `pkg`: se cambi il pacchetto di una funzionalità, cambia anche la sala.
+
 Nell'atrio del laboratorio il cliente indica settore e nome dell'attività, accende le funzionalità che gli servono e vede un'anteprima del suo sito che prende forma. Il pacchetto consigliato è il più basso che include tutte le funzionalità scelte (`js/configurator.js`).
 
 - **Funzionalità e pacchetti:** in `data/config.json` → `features` (campo `pkg`). **È una bozza da confermare** (`featuresDraft: true`, mostra la nota "Elenco funzionalità in bozza").
