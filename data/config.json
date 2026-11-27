@@ -1,0 +1,36 @@
+{
+  "_note": "Configurazione del sito. 'mode' = 'demo' finché Stripe non è configurato. Postazioni e date qui sotto sono DIMOSTRATIVE: vanno sostituite con la pianificazione reale dello studio (o servite dal backend /api/slots).",
+  "mode": "demo",
+  "api": "/.netlify/functions",
+  "currency": "CHF",
+  "depositPercent": 40,
+  "contactEmail": "",
+  "packages": {
+    "start":    { "name": "Start",     "price": 890,  "from": false, "desc": "Sito con una lingua a scelta" },
+    "business": { "name": "Business",  "price": 1290, "from": false, "desc": "Per aziende che vogliono crescere" },
+    "premium":  { "name": "Premium",   "price": 2490, "from": true,  "desc": "Lingue illimitate" },
+    "custom":   { "name": "Su misura", "price": null, "from": false, "desc": "Progetti speciali" }
+  },
+  "slotsAreDemo": true,
+  "slots": {
+    "start": [
+      { "id": "S01", "status": "occupied" }, { "id": "S02", "status": "free", "start": "2026-12-08", "online": "2026-12-20" },
+      { "id": "S03", "status": "occupied" }, { "id": "S04", "status": "free", "start": "2026-12-15", "online": "2027-01-08" },
+      { "id": "S05", "status": "occupied" }, { "id": "S06", "status": "occupied" },
+      { "id": "S07", "status": "free", "start": "2027-01-12", "online": "2027-01-26" }, { "id": "S08", "status": "occupied" }
+    ],
+    "business": [
+      { "id": "B01", "status": "occupied" }, { "id": "B02", "status": "free", "start": "2026-12-09", "online": "2026-12-23" },
+      { "id": "B03", "status": "occupied" }, { "id": "B04", "status": "free", "start": "2027-01-12", "online": "2027-01-30" },
+      { "id": "B05", "status": "occupied" }, { "id": "B06", "status": "occupied" }
+    ],
+    "premium": [
+      { "id": "P01", "status": "occupied" }, { "id": "P02", "status": "free", "start": "2026-12-14", "online": "2027-01-15" },
+      { "id": "P03", "status": "free", "start": "2027-01-18", "online": "2027-02-19" }, { "id": "P04", "status": "occupied" }
+    ],
+    "custom": [
+      { "id": "X01", "status": "free", "start": "su appuntamento", "online": "da definire insieme" },
+      { "id": "X02", "status": "occupied" }
+    ]
+  }
+}

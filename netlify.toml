@@ -1,0 +1,10 @@
+[build]
+  publish = "."
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  included_files = ["data/config.json"]
+[[headers]]
+  for = "/data/*"
+  [headers.values]
+    Cache-Control = "no-store"

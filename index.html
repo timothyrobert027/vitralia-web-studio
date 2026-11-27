@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vitralia Web Studio</title>
+<meta name="description" content="Vitralia Web Studio: entra nella V, visita The Website Lab, scegli il tuo reparto e la tua postazione, fai decollare il tuo sito.">
+<meta property="og:title" content="Vitralia Web Studio">
+<meta property="og:description" content="Stay ahead. Build beyond.">
+<meta property="og:image" content="assets/og.jpg">
+<meta name="theme-color" content="#04070f">
+<link rel="icon" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">{ "imports": { "three": "./js/vendor/three.module.js" } }</script>
+</head>
+<body>
+<canvas id="gl" aria-label="Il mondo di Vitralia in 3D: la V, il tunnel, il laboratorio sulla Luna"></canvas>
+
+<header class="bar">
+  <span class="brand" aria-label="Vitralia Web Studio"><svg viewBox="0 0 1700 1900" width="18" height="20" aria-hidden="true"><defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#2f6bff"/><stop offset=".5" stop-color="#2392d2"/><stop offset="1" stop-color="#17b8a6"/></linearGradient></defs><path d="M65 278H497L845 1180L1193 278H1625L1029 1822H662Z" fill="none" stroke="url(#lg)" stroke-width="120" stroke-linejoin="miter"/></svg>VITRALIA</span>
+  <div class="tools"><button class="lnk" id="sound" type="button" aria-pressed="false">Audio</button><button class="lnk" id="skip" type="button">Salta</button></div>
+</header>
+
+<h1 id="say" aria-live="polite"></h1>
+<div id="tag" aria-hidden="true"><b></b><span></span></div>
+
+<nav id="dock" aria-label="Scelte"></nav>
+
+<section id="pass" aria-label="Carta d'imbarco" hidden>
+  <div class="pass-top"><span class="pass-brand"><svg viewBox="0 0 1700 1900" width="26" height="29" aria-hidden="true"><path d="M65 278H497L845 1180L1193 278H1625L1029 1822H662Z" fill="url(#lg)"/></svg><span>VITRALIA<small>WEB STUDIO</small></span></span><span class="pass-kind">CARTA D'IMBARCO <svg class="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4L3 11l7 2 2 7z"/><path d="M10 13l11-9"/></svg></span></div>
+  <div class="route"><div><b>OFF</b><small>Il tuo business oggi</small></div><i><span></span><svg class="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4L3 11l7 2 2 7z"/><path d="M10 13l11-9"/></svg></i><div class="r"><b class="to">TOP</b><small>Online, trovato, scelto</small></div></div>
+  <div class="pass-body">
+    <dl class="fields">
+      <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/></svg>Reparto</dt><dd id="fDept"></dd></div>
+      <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.2"/><path d="M5 20c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/></svg>Postazione</dt><dd id="fSlot"></dd></div>
+      <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Data di avvio</dt><dd id="fStart"></dd></div>
+      <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>Online il</dt><dd id="fOnline"></dd></div>
+      <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v10M9.5 9.5c0-1.2 1.1-2 2.5-2s2.5.8 2.5 2-1.1 1.7-2.5 2-2.5.9-2.5 2.1 1.1 2 2.5 2 2.5-.8 2.5-2"/></svg>Prezzo</dt><dd id="fPrice"></dd></div>
+      <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Acconto</dt><dd id="fDeposit"></dd></div>
+    </dl>
+    <figure class="laptop" aria-hidden="true"><div class="lid"><img id="passShot" alt=""></div><div class="kb"></div></figure>
+  </div>
+  <p class="demo-note" id="demoNote" hidden>Postazioni e date dimostrative.</p>
+  <div class="acts">
+    <button class="btn" id="go" type="button"><svg class="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4L3 11l7 2 2 7z"/><path d="M10 13l11-9"/></svg><span class="t"><span>Prendi il volo</span><small>Paga l'acconto e avvia il tuo progetto</small></span></button>
+    <button class="pill" id="upgrade" type="button"></button>
+    <button class="pill" id="change" type="button">Cambia scelta</button>
+  </div>
+</section>
+
+<div class="ov" id="pay" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="payT">
+  <h2 id="payT">Avvia il tuo progetto</h2>
+  <p id="payTxt"></p>
+  <div class="amt" id="payAmt"></div>
+  <button class="btn" id="payGo" type="button"><span>Continua</span></button>
+  <button class="lnk" id="payBack" type="button">Annulla</button>
+  <p class="small" id="payFine"></p>
+</div></div>
+
+<section id="final" aria-live="polite" hidden>
+  <p class="orbit-title">IL TUO SITO<br>È IN <span class="hl">ORBITA.</span></p>
+  <svg class="orbit-v" viewBox="0 0 1700 1900" width="46" height="52" aria-hidden="true"><path d="M65 278H497L845 1180L1193 278H1625L1029 1822H662Z" fill="url(#lg)"/></svg>
+  <p class="orbit-brand">VITRALIA</p>
+  <p class="orbit-sub">WEB STUDIO</p>
+  <p class="orbit-claim">STAY AHEAD. BUILD BEYOND.</p>
+  <button class="lnk" id="again" type="button">Ricomincia il viaggio</button>
+</section>
+
+<div id="nogl" hidden>
+  <img src="assets/references/storyboard-8-scene.png" alt="Lo storyboard dell'esperienza Vitralia">
+  <p>Il tuo dispositivo non supporta la grafica 3D necessaria per l'esperienza completa.</p>
+</div>
+<div id="loading"><span></span></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
