@@ -134,7 +134,59 @@ export function buildTunnel(curve, { count = 60, edgeR = 0.13, from = 0.0, to = 
     }
   }
   const edges = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
-  const glass = new THREE.Mesh(mergeGeometries(glassGeos), new THREE.MeshBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
-  const g = new THREE.Group(); g.add(glass, edges); g.name = 'VTunnel';
+  const glass = new THREE.Mesh(mergeGeometries(glassGeos), new THREE.MeshBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+
+  // ---- pareti di vetro continue: la sagoma degli strati della V estrusa lungo la curva ----
+  // ogni punto sa dove si trova lungo il tunnel (s, in unità) e lungo il perimetro (p): lo shader ci disegna
+  // corsie di luce longitudinali, anelli luminosi che corrono verso la camera e il riflesso del vetro ai bordi.
+  const per = [];
+  for (let k = 0; k < 4; k++) { const a = pts[k], b = pts[(k + 1) % 4]; for (let j = 0; j < 16; j++) { const f = j / 16; per.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]); } }
+  per.push(per[0]);
+  const rows = Math.max(60, count * 3), cols = per.length, pos = new Float32Array(rows * cols * 3), aS = new Float32Array(rows * cols), aP = new Float32Array(rows * cols), aX = new Float32Array(rows * cols);
+  const total = curve.getLength() * (to - from), v = new THREE.Vector3();
+  for (let i = 0; i < rows; i++) {
+    const f = i / (rows - 1), u = from + (to - from) * f, p = curve.getPointAt(u), t = curve.getTangentAt(u).normalize();
+    const z = t.clone().negate(), x = new THREE.Vector3().crossVectors(up, z).normalize(), y = new THREE.Vector3().crossVectors(z, x);
+    m.makeBasis(x, y, z).setPosition(p);
+    for (let j = 0; j < cols; j++) {
+      v.set(per[j][0], per[j][1], 0).applyMatrix4(m); const o = (i * cols + j);
+      pos.set([v.x, v.y, v.z], o * 3); aS[o] = f * total; aP[o] = j / (cols - 1); aX[o] = (per[j][0] - xMin) / (xMax - xMin);
+    }
+  }
+  const idx = []; for (let i = 0; i < rows - 1; i++) for (let j = 0; j < cols - 1; j++) { const a = i * cols + j, b = a + cols; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); wg.setAttribute('aS', new THREE.BufferAttribute(aS, 1)); wg.setAttribute('aP', new THREE.BufferAttribute(aP, 1)); wg.setAttribute('aX', new THREE.BufferAttribute(aX, 1)); wg.setIndex(idx); wg.computeVertexNormals();
+  const uniforms = { time: { value: 0 }, total: { value: total }, c1: { value: logoGradient(0).multiplyScalar(1.6) }, c2: { value: logoGradient(1).multiplyScalar(1.6) }, glow: { value: 1 } };
+  const walls = new THREE.Mesh(wg, new THREE.ShaderMaterial({ uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, toneMapped: false,
+    vertexShader: 'attribute float aS;attribute float aP;attribute float aX;varying float vS;varying float vP;varying float vX;varying vec3 vN;varying vec3 vV;void main(){vS=aS;vP=aP;vX=aX;vec4 mv=modelViewMatrix*vec4(position,1.);vN=normalize(normalMatrix*normal);vV=-mv.xyz;gl_Position=projectionMatrix*mv;}',
+    fragmentShader: `uniform float time;uniform float total;uniform vec3 c1;uniform vec3 c2;uniform float glow;varying float vS;varying float vP;varying float vX;varying vec3 vN;varying vec3 vV;
+      void main(){
+        float d=length(vV); vec3 v=vV/d;
+        float fres=pow(1.-abs(dot(normalize(vN),v)),2.2);                 // il vetro si accende di taglio
+        float lanes=pow(abs(sin(vP*3.14159*32.)),60.);                   // corsie di luce lungo le pareti
+        float ring=pow(.5+.5*sin(vS*.16+time*7.),40.);                    // anelli che corrono verso la camera
+        float flow=pow(.5+.5*sin(vS*.045+vP*40.+time*3.),8.)*.35;          // riflessi che scorrono
+        float ends=smoothstep(0.,40.,vS)*(1.-smoothstep(total*.72,total,vS));
+        float depth=smoothstep(320.,30.,d)*smoothstep(3.,14.,d);          // il fondo sfuma nel buio, nulla troppo vicino all'obiettivo
+        vec3 col=mix(c1,c2,vX);
+        float a=(.022+.14*fres+lanes*.16+ring*.28+flow*.08)*ends*depth*glow;
+        gl_FragColor=vec4(col*(1.+ring*.8),a);
+      }` }));
+  walls.renderOrder = 3;
+
+  // ---- scie di luce: brevi tratti allineati alla direzione di volo, danno la sensazione di velocità ----
+  const nS = 700, sp = new Float32Array(nS * 6), sc = new Float32Array(nS * 6);
+  for (let i = 0; i < nS; i++) {
+    const u = from + (to - from) * (0.03 + 0.85 * ((i * 0.618) % 1)), p = curve.getPointAt(u), t = curve.getTangentAt(u).normalize();
+    const z = t.clone().negate(), x = new THREE.Vector3().crossVectors(up, z).normalize(), y = new THREE.Vector3().crossVectors(z, x);
+    const a = ((i * 2.399) % (Math.PI * 2)), r = 1.4 + ((i * 0.377) % 1) * 1.7, off = x.clone().multiplyScalar(Math.cos(a) * r * 1.3).addScaledVector(y, Math.sin(a) * r);
+    const p0 = p.clone().add(off), p1 = p0.clone().addScaledVector(t, 2.5 + ((i * 0.71) % 1) * 5);
+    sp.set([p0.x, p0.y, p0.z, p1.x, p1.y, p1.z], i * 6);
+    const c = logoGradient((Math.cos(a) + 1) / 2); sc.set([0, 0, 0, c.r * 1.4, c.g * 1.4, c.b * 1.4], i * 6);
+  }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3)); sg.setAttribute('color', new THREE.BufferAttribute(sc, 3));
+  const streaks = new THREE.LineSegments(sg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+
+  const g = new THREE.Group(); g.add(walls, glass, edges, streaks); g.name = 'VTunnel';
+  g.userData.uniforms = uniforms;
   return g;
 }

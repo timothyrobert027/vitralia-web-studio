@@ -4,6 +4,7 @@ import { EffectComposer } from './vendor/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from './vendor/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from './vendor/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from './vendor/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from './vendor/jsm/postprocessing/ShaderPass.js';
 import { RoundedBoxGeometry } from './vendor/jsm/geometries/RoundedBoxGeometry.js';
 import { PALETTE, C } from './palette.js';
 import { buildV, buildTunnel } from './vgeometry.js';
@@ -111,13 +112,24 @@ const rig = new CameraRig(cam);
 const adj = (f) => { const a = innerWidth / innerHeight; if (a >= 1.2) return f; return Math.min(74, (2 * Math.atan((Math.tan(rad(f) / 2) * 1.45) / a) * 180) / Math.PI); };
 const P = (p, t, fov) => ({ p: p.clone ? p.clone() : new THREE.Vector3(...p), t: t.clone ? t.clone() : new THREE.Vector3(...t), fov: adj(fov) });
 
-let composer = null, bloom = null;
+let composer = null, bloom = null, lens = null;
 function makeComposer() {
   composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, cam));
   bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), mobile ? 0.45 : 0.6, 0.55, 0.86);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  // finitura da obiettivo cinematografico: grana fine, vignettatura morbida, lieve separazione dei colori ai bordi (più forte in velocità)
+  lens = new ShaderPass({ uniforms: { tDiffuse: { value: null }, time: { value: 0 }, ca: { value: 0 }, vig: { value: 0.32 }, grain: { value: mobile ? 0.025 : 0.035 } },
+    vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader: `uniform sampler2D tDiffuse;uniform float time;uniform float ca;uniform float vig;uniform float grain;varying vec2 vUv;
+      float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+      void main(){vec2 d=vUv-.5;float r=length(d);vec2 o=d*ca*r;
+        vec3 c=vec3(texture2D(tDiffuse,vUv+o).r,texture2D(tDiffuse,vUv).g,texture2D(tDiffuse,vUv-o).b);
+        c*=mix(1.,smoothstep(.95,.22,r),vig);
+        c+=(h(vUv*vec2(1731.,977.)+fract(time*7.3))-.5)*grain;
+        gl_FragColor=vec4(c,1.);}` });
+  composer.addPass(lens);
 }
 makeComposer();
 
@@ -272,6 +284,13 @@ function enter() {
       word.material.opacity = smooth((z - 6) / 10);
       if (u > 0.15 && !lab.lab.visible) lab.lab.visible = true;
       V.visible = u < 0.5; tunnel.visible = u < uT1 + 0.08;
+      const tk = Math.sin(Math.PI * clamp01((u - uT0 + 0.02) / (uT1 - uT0 + 0.04))), now = performance.now() / 1000;
+      if (!reduce) {
+        cam.fov += (portraitNow() ? 9 : 15) * tk; cam.updateProjectionMatrix();
+        const roll = 0.045 * tk * Math.sin(now * 0.55); cam.up.set(Math.sin(roll), Math.cos(roll), 0);
+      }
+      lens.uniforms.ca.value = (mobile ? 0.008 : 0.014) * tk;
+      tunnel.userData.uniforms.glow.value = 0.6 + 0.4 * tk;
     },
     onDone: arriveLab,
   });
@@ -281,7 +300,7 @@ function setMoon(a) {
 }
 // 3 - il laboratorio visto dall'alto
 function arriveLab() {
-  renderer.setClearColor(0x1b2a47);
+  renderer.setClearColor(0x1b2a47); cam.up.set(0, 1, 0); lens.uniforms.ca.value = 0;
   V.visible = tunnel.visible = false; setMoon(1); rig.breath = 1;
   store.go('LAB_EXTERIOR');
   say('The Website Lab', 2600);
@@ -292,6 +311,7 @@ function skip() {
   store.go('LAB_EXTERIOR');
   rig.move = null; dock(null);
   V.visible = tunnel.visible = false; lab.lab.visible = moon.visible = moon.userData.rocks.visible = true; setMoon(1);
+  cam.up.set(0, 1, 0); lens.uniforms.ca.value = 0;
   rig.set(OVER); rig.breath = 1; renderer.setClearColor(0x1b2a47); say('The Website Lab', 2400);
   setTimeout(toLobby, 1800);
 }
@@ -623,7 +643,7 @@ function frame() {
   } else for (const k of KEYS) for (const s of lab.seats[k]) if (s.halo.material.opacity) s.halo.material.opacity = 0;
   for (const w of lab.walkers) { const a = now * 0.18 + w.userData.ph; w.position.set(Math.cos(a) * 2.6, 0.31, Math.sin(a) * 2.6 - 1.8); w.rotation.y = -a; }
   space.earth.rotation.y += dt * 0.004; space.earth.userData.city.rotation.y = space.earth.rotation.y;
-  rooms.tick(dt, now); tickLaunch(now); space.stars.position.copy(cam.position); // il cielo è infinitamente lontano dust.material.uniforms.cam.value.copy(cam.position); dust.material.uniforms.off.value += dt * (store.state === 'ORBIT' ? 6 : 0);
+  rooms.tick(dt, now); if (tunnel.visible) tunnel.userData.uniforms.time.value = now; lens.uniforms.time.value = now; tickLaunch(now); space.stars.position.copy(cam.position); // il cielo è infinitamente lontano dust.material.uniforms.cam.value.copy(cam.position); dust.material.uniforms.off.value += dt * (store.state === 'ORBIT' ? 6 : 0);
   if (ui.tag._w) placeTag();
   composer.render(dt);
   // qualità adattiva: se il dispositivo fatica, si riduce la risoluzione
