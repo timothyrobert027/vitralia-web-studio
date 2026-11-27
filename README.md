@@ -55,6 +55,14 @@ Il passaggio a `LAUNCH` viene rifiutato se il pagamento non è confermato. L'uni
 
 ## Crediti delle immagini
 
+- `assets/tex/`: texture fotorealistiche generate con Higgsfield (GPT Image 2.6, qualità massima, 4K, poi ridotte a 2K per computer e 1K per telefono, suffisso `-m`):
+  - regolite e terreno lunare (superficie della Luna e sassi)
+  - cielo con la Via Lattea (panorama chiuso a 360° con una copia specchiata)
+  - scafo del razzo
+  - pavimento del laboratorio
+  - alluminio spazzolato
+  - rampa di lancio
+
 - `assets/earth/day*.jpg`: NASA Blue Marble (pubblico dominio), dal pacchetto npm `three-globe`.
 - `assets/earth/night*.jpg`: NASA Earth at Night (pubblico dominio), dal pacchetto npm `three-globe`.
 - `js/vendor/`: three.js r160 (licenza MIT).

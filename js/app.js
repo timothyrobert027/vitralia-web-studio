@@ -180,7 +180,7 @@ function fitPass() {
 }
 
 // Finale: il sito in orbita, la scia blu-verde acqua.
-const panel = new THREE.Group(); panel.visible = false; scene.add(panel); window.vitralia.panel = panel; window.vitralia.cam = cam; window.vitralia.space = space; window.vitralia.scene = scene; window.vitralia.moon = moon;
+const panel = new THREE.Group(); panel.visible = false; scene.add(panel); window.vitralia.panel = panel; window.vitralia.cam = cam; window.vitralia.rk = rk; window.vitralia.rig = rig; window.vitralia.space = space; window.vitralia.scene = scene; window.vitralia.moon = moon;
 const panelFace = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 9.1), new THREE.MeshBasicMaterial({ map: siteScreen(PALETTE.azure, 'Il tuo sito'), toneMapped: false, transparent: true, opacity: 0.95 }));
 {
   const glass = new THREE.Mesh(new RoundedBoxGeometry(16, 10.4, 0.5, 5, 0.9), mobile ? new THREE.MeshPhysicalMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.25, clearcoat: 1, envMapIntensity: 1.5, depthWrite: false }) : mats.heroGlass.clone());
@@ -200,7 +200,7 @@ const dust = (() => {
     fragmentShader: 'varying float a;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;gl_FragColor=vec4(vec3(.75,.88,1.),a*.55*(1.-d*2.));}' });
   const d = new THREE.Points(g, m); d.frustumCulled = false; d.visible = false; scene.add(d); return d;
 })();
-comet.visible = false; scene.add(comet);
+comet.visible = false; scene.add(comet); window.vitralia.comet = comet;
 space.orbit.material.color = new THREE.Color(PALETTE.teal).multiplyScalar(2.2);
 space.orbit.visible = false;
 
@@ -549,8 +549,9 @@ function tickLaunch(now) {
   R.visible = u < 0.99; R.scale.setScalar(1 + 2.5 * smooth((u - 0.6) / 0.4)); // da lontano resta visibile come un punto di luce fino all'ultimo
   if (fx.arrived) trail.material.uniforms.dim.value = Math.max(0.45, 1 - (now - fx.arrived) * 0.3);
   // il bagliore del motore: da lontano il razzo resta un punto di luce che sale e si spegne
-  comet.visible = t > 1.7 && u < 0.995;
-  if (comet.visible) { comet.position.copy(R.position).addScaledVector(tan, -1.5); const dist = cam.position.distanceTo(R.position); comet.scale.setScalar(Math.max(4, dist * 0.035)); comet.material.opacity = 0.9 * (1 - smooth((u - 0.93) / 0.065)); }
+  const dist = cam.position.distanceTo(R.position);
+  comet.visible = t > 1.7 && u < 0.995 && dist > 70; // da vicino basta la fiamma
+  if (comet.visible) { comet.position.copy(R.position).addScaledVector(tan, -1.5); comet.scale.setScalar(Math.max(4, dist * 0.035)); comet.material.opacity = 0.9 * smooth((dist - 70) / 120) * (1 - smooth((u - 0.93) / 0.065)); }
 }
 // dopo l'arrivo non si sta fermi: la camera continua a scivolare in orbita
 const drift = (d) => (reduce ? new THREE.Vector3() : new THREE.Vector3(Math.sin(d * 0.05) * 16, Math.sin(d * 0.07) * 5, -Math.sin(d * 0.035) * 22));
@@ -622,7 +623,7 @@ function frame() {
   } else for (const k of KEYS) for (const s of lab.seats[k]) if (s.halo.material.opacity) s.halo.material.opacity = 0;
   for (const w of lab.walkers) { const a = now * 0.18 + w.userData.ph; w.position.set(Math.cos(a) * 2.6, 0.31, Math.sin(a) * 2.6 - 1.8); w.rotation.y = -a; }
   space.earth.rotation.y += dt * 0.004; space.earth.userData.city.rotation.y = space.earth.rotation.y;
-  rooms.tick(dt, now); tickLaunch(now); dust.material.uniforms.cam.value.copy(cam.position); dust.material.uniforms.off.value += dt * (store.state === 'ORBIT' ? 6 : 0);
+  rooms.tick(dt, now); tickLaunch(now); space.stars.position.copy(cam.position); // il cielo è infinitamente lontano dust.material.uniforms.cam.value.copy(cam.position); dust.material.uniforms.off.value += dt * (store.state === 'ORBIT' ? 6 : 0);
   if (ui.tag._w) placeTag();
   composer.render(dt);
   // qualità adattiva: se il dispositivo fatica, si riduce la risoluzione

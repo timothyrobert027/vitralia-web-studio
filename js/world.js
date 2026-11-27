@@ -1,7 +1,7 @@
 // Il mondo unico: spazio, Terra, Luna, il laboratorio circolare, il razzo. Tutto nella stessa scena, nella stessa luce.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from './vendor/jsm/geometries/RoundedBoxGeometry.js';
-import { mergeGeometries } from './vendor/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from './vendor/jsm/utils/BufferGeometryUtils.js';
 import { buildV, buildTunnel, vShape } from './vgeometry.js';
 import { PALETTE, C, logoGradient } from './palette.js';
 
@@ -21,6 +21,15 @@ export const DEPTS = {
 const rad = (d) => (d * Math.PI) / 180;
 const polar = (r, deg, y = 0) => new THREE.Vector3(r * Math.cos(rad(deg)), y, r * Math.sin(rad(deg)));
 const rnd = (i) => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+// ---------- texture fotorealistiche (generate con Higgsfield, assets/tex) ----------
+const _ld = new THREE.TextureLoader();
+export function photoTex(name, mobile, { rep = [1, 1], srgb = true } = {}) {
+  const t = _ld.load(`assets/tex/${name}${mobile ? '-m' : ''}.jpg`);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); t.anisotropy = 8;
+  return t;
+}
 
 // ---------- texture disegnate in codice ----------
 export function canvasTex(w, h, draw, { srgb = true, repeat = 0 } = {}) {
@@ -67,9 +76,9 @@ export function makeMaterials(mobile) {
     heroGlass,
     cardGlass: heroGlass.clone(),
     facade: new THREE.MeshPhysicalMaterial({ color: 0xcfe6ff, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.13, envMapIntensity: 2.2, side: THREE.DoubleSide, depthWrite: false }),
-    frame: new THREE.MeshStandardMaterial({ color: 0xc7d0dc, roughness: 0.28, metalness: 0.9, envMapIntensity: 1.2 }),
+    frame: new THREE.MeshStandardMaterial({ map: photoTex('alu', mobile), color: 0xe6ebf2, roughness: 0.32, metalness: 0.85, envMapIntensity: 1.2 }),
     white: new THREE.MeshStandardMaterial({ color: 0xd9dfe8, roughness: 0.3, metalness: 0.05, envMapIntensity: 1 }),
-    floor: new THREE.MeshStandardMaterial({ color: 0x1d2840, roughness: 0.34, metalness: 0.35, envMapIntensity: 1.8 }),
+    floor: new THREE.MeshStandardMaterial({ map: photoTex('floor', mobile, { rep: [7, 7] }), color: 0xffffff, roughness: 0.3, metalness: 0.25, envMapIntensity: 1.6 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x1b2135, roughness: 0.45, metalness: 0.2 }),
     navy: new THREE.MeshStandardMaterial({ color: 0x1b2a55, roughness: 0.65 }),
     skin: new THREE.MeshStandardMaterial({ color: 0xd9c4b4, roughness: 0.7 }),
@@ -79,13 +88,10 @@ export function makeMaterials(mobile) {
 
 // ---------- cielo: stelle, Terra con atmosfera, orbita e sito ----------
 export function buildSpace(scene, mobile) {
-  const n = mobile ? 2500 : 6000, p = new Float32Array(n * 3), s = new Float32Array(n);
-  for (let i = 0; i < n; i++) { const u = rnd(i) * 2 - 1, t = rnd(i + 3) * Math.PI * 2, r = 9000, q = Math.sqrt(1 - u * u); p[i * 3] = r * q * Math.cos(t); p[i * 3 + 1] = r * u; p[i * 3 + 2] = r * q * Math.sin(t); s[i] = 0.5 + rnd(i + 7) * 1.6; }
-  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(p, 3)); sg.setAttribute('size', new THREE.BufferAttribute(s, 1));
-  const stars = new THREE.Points(sg, new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { px: { value: Math.min(2, devicePixelRatio || 1) } },
-    vertexShader: 'attribute float size;uniform float px;varying float a;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;gl_PointSize=size*px;a=.35+.5*fract(sin(dot(position.xy,vec2(12.9,78.2)))*43758.5);}',
-    fragmentShader: 'varying float a;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;gl_FragColor=vec4(vec3(.88,.92,1.),a*(1.-d*2.));}' }));
-  stars.frustumCulled = false; scene.add(stars);
+  // il cielo: panorama a 360° con la Via Lattea (segue la camera, quindi è sempre "infinitamente" lontano)
+  const sky = photoTex('sky', mobile); sky.wrapT = THREE.ClampToEdgeWrapping;
+  const stars = new THREE.Mesh(new THREE.SphereGeometry(9500, 64, 32), new THREE.MeshBasicMaterial({ map: sky, side: THREE.BackSide, depthWrite: false, fog: false, toneMapped: false, color: 0xd8d8d8 }));
+  stars.renderOrder = -10; stars.frustumCulled = false; scene.add(stars);
 
   // Terra: NASA Blue Marble (giorno) e Earth at Night (città), immagini di pubblico dominio
   const ld = new THREE.TextureLoader(), sfx = mobile ? '-2k' : '';
@@ -124,34 +130,21 @@ export const MOON_R = 2800;                                     // la Luna è un
 export const MOON_C = new THREE.Vector3(LAB.x, LAB.y - MOON_R, LAB.z);
 const onMoon = (x, z, lift = 0) => { const d = new THREE.Vector3(x - MOON_C.x, 0, z - MOON_C.z); d.y = Math.sqrt(Math.max(0, MOON_R * MOON_R - d.x * d.x - d.z * d.z)); d.normalize(); return { p: MOON_C.clone().addScaledVector(d, MOON_R + lift), n: d }; };
 export function buildMoon(scene, mats, mobile) {
-  // mappa delle altezze: rumore su più scale + crateri con conca e bordo (disegnati anche oltre i bordi: la texture si ripete senza giunture)
-  const S = mobile ? 1024 : 2048, k = S / 2048;
-  const H = document.createElement('canvas'); H.width = H.height = S; const h = H.getContext('2d');
-  h.fillStyle = '#808080'; h.fillRect(0, 0, S, S);
-  for (const [n, a] of [[16, 0.35], [64, 0.22], [256, 0.12]]) { const c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d'), d = x.createImageData(n, n); for (let i = 0; i < n * n; i++) { const v = rnd(i * 7 + n) * 255; d.data.set([v, v, v, 255], i * 4); } x.putImageData(d, 0, 0); h.globalAlpha = a; h.imageSmoothingEnabled = true; h.drawImage(c, 0, 0, S, S); }
-  h.globalAlpha = 1;
-  const crater = (cx, cy, r) => {
-    for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
-      const x = cx + ox, y = cy + oy; if (x + r * 1.6 < 0 || x - r * 1.6 > S || y + r * 1.6 < 0 || y - r * 1.6 > S) continue;
-      let g = h.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(0,0,0,.55)'); g.addColorStop(0.7, 'rgba(0,0,0,.3)'); g.addColorStop(1, 'rgba(0,0,0,0)'); h.fillStyle = g; h.beginPath(); h.arc(x, y, r, 0, 7); h.fill();
-      g = h.createRadialGradient(x, y, r * 0.82, x, y, r * 1.55); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.22, 'rgba(255,255,255,.6)'); g.addColorStop(1, 'rgba(255,255,255,0)'); h.fillStyle = g; h.beginPath(); h.arc(x, y, r * 1.55, 0, 7); h.fill();
-    }
+  // superficie: terreno lunare a grande scala (mari e crateri visti dall'alto) moltiplicato per la regolite in dettaglio;
+  // il rilievo viene dalla regolite (crateri piccoli, sassi). Texture fotorealistiche generate con Higgsfield.
+  const map = photoTex('terrain', mobile, { rep: [9, 4.5] });
+  const detail = photoTex('regolith', mobile);
+  const bump = photoTex('regolith-h', mobile, { rep: [110, 55], srgb: false });
+  const mat = new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 3.2, roughness: 1, metalness: 0, color: 0xe2e4ea });
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.detailMap = { value: detail }; sh.uniforms.detailScale = { value: 110 / 9 };
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D detailMap;uniform float detailScale;')
+      .replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\ndiffuseColor.rgb *= texture2D(detailMap, vMapUv * detailScale).rgb * 2.05;\n#endif');
   };
-  for (let i = 0; i < 900; i++) crater(rnd(i) * S, rnd(i + 9) * S, (2 + Math.pow(rnd(i + 3), 4) * 150) * k);
-  // colore: grigio lunare, mari più scuri, il rilievo leggermente impresso
-  const Ccv = document.createElement('canvas'); Ccv.width = Ccv.height = S; const c = Ccv.getContext('2d');
-  c.fillStyle = '#74767c'; c.fillRect(0, 0, S, S);
-  for (let i = 0; i < 14; i++) { const x = rnd(i + 400) * S, y = rnd(i + 410) * S, r = (200 + rnd(i + 420) * 500) * k; for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { const g = c.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); g.addColorStop(0, 'rgba(40,42,48,.35)'); g.addColorStop(1, 'rgba(40,42,48,0)'); c.fillStyle = g; c.fillRect(x + ox - r, y + oy - r, 2 * r, 2 * r); } }
-  c.globalAlpha = 0.45; c.globalCompositeOperation = 'overlay'; c.drawImage(H, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
-  const rep = (t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(60, 30); t.anisotropy = 8; return t; };
-  const map = rep(new THREE.CanvasTexture(Ccv)); map.colorSpace = THREE.SRGBColorSpace;
-  const bump = rep(new THREE.CanvasTexture(H));
-  const mat = new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 5, roughness: 1, metalness: 0, color: 0xb4b7be });
+  const cm = new THREE.MeshStandardMaterial({ map: photoTex('regolith', mobile, { rep: [2, 2] }), bumpMap: photoTex('regolith-h', mobile, { rep: [2, 2], srgb: false }), bumpScale: 2.5, roughness: 1, color: 0xc4c6cc });
   const ground = new THREE.Mesh(new THREE.SphereGeometry(MOON_R, mobile ? 192 : 320, mobile ? 96 : 160), mat);
   ground.position.copy(MOON_C); ground.rotation.z = Math.PI / 2; ground.receiveShadow = !mobile; scene.add(ground);
   // crateri 3D attorno al laboratorio: pareti interne in ombra, bordi in luce radente
-  const cm = new THREE.MeshStandardMaterial({ map: map.clone(), bumpMap: bump.clone(), bumpScale: 3, roughness: 1, color: 0xb4b7be });
-  cm.map.repeat.set(2, 2); cm.bumpMap.repeat.set(2, 2);
   const craters = new THREE.Group(); scene.add(craters);
   for (let i = 0; i < (mobile ? 10 : 18); i++) {
     const a = rnd(i + 50) * Math.PI * 2, r = 55 + rnd(i + 51) * 380, cr = 5 + Math.pow(rnd(i + 52), 2) * 38;
@@ -161,7 +154,12 @@ export function buildMoon(scene, mats, mobile) {
     m.position.copy(at.p); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), at.n); m.receiveShadow = m.castShadow = !mobile; craters.add(m);
   }
   // sassi
-  const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x8e9096, roughness: 1, flatShading: true }), mobile ? 140 : 420);
+  // sassi irregolari: sfera deformata con la stessa regolite (niente poliedri regolari)
+  const rg = mergeVertices(new THREE.IcosahedronGeometry(1, 3).deleteAttribute('normal').deleteAttribute('uv')), rp = rg.attributes.position;
+  for (let i = 0; i < rp.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(rp, i), n = 0.72 + 0.28 * Math.abs(Math.sin(v.x * 3.1 + 1.7) * Math.cos(v.y * 2.3 - v.z * 2.9)) + 0.12 * Math.sin(v.x * 9 + v.z * 7); v.multiplyScalar(n); v.y *= 0.78; rp.setXYZ(i, v.x, v.y, v.z); }
+  rg.computeVertexNormals();
+  { const uv = new Float32Array(rp.count * 2); for (let i = 0; i < rp.count; i++) { const x = rp.getX(i), y = rp.getY(i), z = rp.getZ(i); uv[i * 2] = 0.5 + Math.atan2(z, x) / (2 * Math.PI); uv[i * 2 + 1] = 0.5 + y * 0.5; } rg.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); }
+  const rocks = new THREE.InstancedMesh(rg, new THREE.MeshStandardMaterial({ map: photoTex('regolith', mobile, { rep: [0.6, 0.6] }), bumpMap: photoTex('regolith-h', mobile, { rep: [0.6, 0.6], srgb: false }), bumpScale: 2, roughness: 1, color: 0xc9ccd2 }), mobile ? 140 : 420);
   const mm = new THREE.Matrix4();
   for (let i = 0; i < rocks.count; i++) { const a = rnd(i) * Math.PI * 2, r = 26 + rnd(i + 1) * 300, sc = 0.2 + Math.pow(rnd(i + 2), 3) * 2.4, at = onMoon(LAB.x + Math.cos(a) * r, LAB.z + Math.sin(a) * r, sc * 0.25); mm.compose(at.p, new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd(i + 3) * 3, rnd(i + 4) * 3, 0)), new THREE.Vector3(sc, sc * 0.6, sc)); rocks.setMatrixAt(i, mm); }
   rocks.castShadow = !mobile; rocks.receiveShadow = !mobile; scene.add(rocks);
@@ -355,7 +353,8 @@ export function buildCards(lab, mats, packages) {
 // ---------- razzo DEPLOY WEBSITES e torre di lancio ----------
 export function buildRocket(lab, mats, mobile) {
   const R = new THREE.Group(); R.position.copy(ROCKET_AT); lab.add(R);
-  const pad = new THREE.Mesh(new THREE.CylinderGeometry(6, 6.6, 1.2, 96), new THREE.MeshStandardMaterial({ color: 0x3a3e46, roughness: 0.6, metalness: 0.4 })); pad.position.y = -0.1; pad.receiveShadow = true; R.add(pad);
+  const padSide = new THREE.MeshStandardMaterial({ color: 0x5a5d63, roughness: 0.85, metalness: 0.1 }), padTop = new THREE.MeshStandardMaterial({ map: photoTex('pad', mobile), roughness: 0.9, metalness: 0.05, color: 0xd6d8dc });
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(6, 6.6, 1.2, 96), [padSide, padTop, padSide]); pad.position.y = -0.1; pad.receiveShadow = true; R.add(pad);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(5.4, 0.05, 8, 128), new THREE.MeshBasicMaterial({ color: new THREE.Color(PALETTE.azure).multiplyScalar(2), toneMapped: false })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.52; R.add(ring);
   // torre a traliccio
   const tw = new THREE.Group(); tw.position.set(-3.2, 0.5, 0); R.add(tw); const tg = [];
@@ -365,11 +364,22 @@ export function buildRocket(lab, mats, mobile) {
   tw.add(new THREE.Mesh(mergeGeometries(tg), mats.frame));
   // il razzo
   const rocket = new THREE.Group(); rocket.position.y = 0.5; R.add(rocket);
-  const tex = canvasTex(512, 1024, (c, w, h) => { c.fillStyle = '#f2f5fa'; c.fillRect(0, 0, w, h); const g = c.createLinearGradient(0, 0, w, 0); g.addColorStop(0, PALETTE.blue); g.addColorStop(1, PALETTE.teal); c.fillStyle = g; c.fillRect(0, h * 0.9, w, 20); c.fillRect(0, h * 0.345, w, 8);
-    c.save(); c.translate(w * 0.25, h * 0.655); c.rotate(-Math.PI / 2); c.font = '600 36px Montserrat, sans-serif'; c.letterSpacing = '8px'; c.fillStyle = '#16203b'; c.textAlign = 'center'; c.fillText('DEPLOY WEBSITES', 0, 18); c.restore();
+  const hullImg = new Image(); hullImg.src = `assets/tex/hull${mobile ? '-m' : ''}.jpg`;
+  const drawHull = (c, w, h) => {
+    c.fillStyle = '#eef1f5'; c.fillRect(0, 0, w, h);
+    if (hullImg.complete && hullImg.naturalWidth) {
+      // pannelli in tessere quasi quadrate; la fuliggine solo nell'ultima fila in basso
+      const tw = w / 2, th = h / 4, sw = hullImg.naturalWidth, sh = hullImg.naturalHeight;
+      for (let r = 0; r < 4; r++) for (let q = 0; q < 2; q++) { const last = r === 3; c.drawImage(hullImg, 0, last ? 0 : 0, sw, last ? sh : sh * 0.74, q * tw, r * th, tw, th); }
+    }
+    const g = c.createLinearGradient(0, 0, w, 0); g.addColorStop(0, PALETTE.blue); g.addColorStop(1, PALETTE.teal); c.fillStyle = g; c.fillRect(0, h * 0.9, w, 40); c.fillRect(0, h * 0.345, w, 16);
+    c.save(); c.translate(w * 0.25, h * 0.655); c.rotate(-Math.PI / 2); c.font = '600 72px Montserrat, sans-serif'; c.letterSpacing = '16px'; c.fillStyle = '#16203b'; c.textAlign = 'center'; c.fillText('DEPLOY WEBSITES', 0, 36); c.restore();
     // la V del logo (stessa sagoma, in scala) sopra la scritta
-    const vs = 0.04, ox = w * 0.25 - 845 * vs, oy = h * 0.37 - 278 * vs; const vg = c.createLinearGradient(ox, 0, ox + 1690 * vs, 0); vg.addColorStop(0, PALETTE.blue); vg.addColorStop(0.5, PALETTE.azure); vg.addColorStop(1, PALETTE.teal);
-    c.fillStyle = vg; c.beginPath(); [[65, 278], [497, 278], [845, 1180], [1193, 278], [1625, 278], [1029, 1822], [662, 1822]].forEach(([x, y], i) => (i ? c.lineTo(ox + x * vs, oy + y * vs) : c.moveTo(ox + x * vs, oy + y * vs))); c.closePath(); c.fill(); });
+    const vs = 0.08, ox = w * 0.25 - 845 * vs, oy = h * 0.37 - 278 * vs; const vg = c.createLinearGradient(ox, 0, ox + 1690 * vs, 0); vg.addColorStop(0, PALETTE.blue); vg.addColorStop(0.5, PALETTE.azure); vg.addColorStop(1, PALETTE.teal);
+    c.fillStyle = vg; c.beginPath(); [[65, 278], [497, 278], [845, 1180], [1193, 278], [1625, 278], [1029, 1822], [662, 1822]].forEach(([x, y], i) => (i ? c.lineTo(ox + x * vs, oy + y * vs) : c.moveTo(ox + x * vs, oy + y * vs))); c.closePath(); c.fill();
+  };
+  const tex = canvasTex(1024, 2048, drawHull);
+  hullImg.onload = () => { drawHull(tex.image.getContext('2d'), 1024, 2048); tex.needsUpdate = true; };
   const prof = [[0, 0], [0.62, 0], [0.7, 0.4], [0.7, 6.2], [0.6, 7.2], [0.4, 8.1], [0.16, 8.8], [0, 9.0]].map(([r, y]) => new THREE.Vector2(r, y));
   const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 96), new THREE.MeshPhysicalMaterial({ map: tex, roughness: 0.25, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.1 })); body.position.y = 1.2; body.castShadow = true; rocket.add(body);
   const win = new THREE.Mesh(new THREE.TorusGeometry(0.71, 0.06, 10, 96), new THREE.MeshBasicMaterial({ color: new THREE.Color(PALETTE.azure).multiplyScalar(1.8), toneMapped: false })); win.rotation.x = Math.PI / 2; win.position.y = 7.6; rocket.add(win);
@@ -380,6 +390,8 @@ export function buildRocket(lab, mats, mobile) {
     vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: 'uniform float t;uniform float k;varying vec2 vUv;void main(){float y=vUv.y;float n=sin(y*40.-t*30.)*.06+sin(y*13.+t*17.)*.05;float core=smoothstep(.0,.9,y)*(1.-abs(vUv.x-.5)*2.);vec3 c=mix(vec3(.45,.75,1.),vec3(1.,.97,.9),pow(y,3.));gl_FragColor=vec4(c*1.8,clamp(core+n,0.,1.)*k*pow(y,.6));}' });
   const flame = new THREE.Mesh(new THREE.ConeGeometry(0.62, 9, 32, 1, true), flameMat); flame.rotation.x = Math.PI; flame.position.y = -3.8; rocket.add(flame);
+  // fari della rampa, come nelle basi di lancio vere: illuminano lo scafo di notte
+  for (const [x, z, c] of [[-9, 11, 0xfff2dd], [10, 9, 0xdfefff]]) { const f = new THREE.SpotLight(c, 260, 45, 0.42, 0.7, 1.6); f.position.set(x, 13, z); f.target.position.set(0, 5, 0); R.add(f, f.target); }
   const engineLight = new THREE.PointLight(0x9fd0ff, 0, 60, 2); engineLight.position.y = -0.5; rocket.add(engineLight);
   // fumo
   const smokeTex = canvasTex(128, 128, (c) => { const g = c.createRadialGradient(64, 64, 4, 64, 64, 64); g.addColorStop(0, 'rgba(225,228,236,.85)'); g.addColorStop(1, 'rgba(225,228,236,0)'); c.fillStyle = g; c.fillRect(0, 0, 128, 128); });
