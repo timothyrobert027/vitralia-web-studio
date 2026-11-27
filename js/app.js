@@ -254,6 +254,9 @@ function enter() {
     onProgress: (u) => {
       const z = cam.position.z;
       V.userData.body.visible = z > 0.6;
+      // gli strati scuri e il centro della V si dissolvono mentre la camera li attraversa: nessun "tappo" nel tunnel
+      for (const f of V.userData.fills) f.material.opacity = f.userData.baseOpacity * smooth((z - f.position.z - 1.5) / 14);
+      V.userData.core.material.opacity = 0.92 * smooth((z - V.userData.core.position.z - 2) / 18);
       word.material.opacity = smooth((z - 6) / 10);
       if (u > 0.15 && !lab.lab.visible) lab.lab.visible = true;
       V.visible = u < 0.5; tunnel.visible = u < uT1 + 0.08;
