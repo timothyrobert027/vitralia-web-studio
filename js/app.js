@@ -21,7 +21,10 @@ const rad = (d) => (d * Math.PI) / 180;
 const polar = (r, deg, y = 0) => new THREE.Vector3(r * Math.cos(rad(deg)), y, r * Math.sin(rad(deg)));
 const L = (x, y, z) => new THREE.Vector3(x, y, z).add(LAB);           // coordinate del laboratorio -> mondo
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const mobile = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 700;
+// versione leggera: richiesta con ?lite, oppure ricordata se questo computer non ha retto gli effetti pesanti
+const store_ = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+const lite = new URLSearchParams(location.search).has('lite') || store_.get('vitralia-lite') === '1';
+const mobile = lite || matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 700;
 
 // ================= stato centralizzato =================
 // Ogni passaggio di scena passa da qui. Il lancio è bloccato se il pagamento non è confermato
@@ -80,13 +83,22 @@ try {
 } catch {
   $('#loading').hidden = true; $('#nogl').hidden = false; throw new Error('WebGL non disponibile');
 }
-let dpr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2);
+// risoluzione limitata a un numero di pixel sostenibile: su schermi grandi e retina il disegno a piena risoluzione bloccava la grafica
+const pxBudget = () => (mobile ? 1.7e6 : 2.6e6);
+let dpr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2, Math.max(0.6, Math.sqrt(pxBudget() / (innerWidth * innerHeight))));
 renderer.setPixelRatio(dpr);
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = !mobile; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); $('#nogl').hidden = false; });
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); goLite('La grafica 3D si è interrotta.'); });
+// se un effetto non si compila su questa scheda grafica, si riparte nella versione leggera (una sola volta)
+function goLite(why) {
+  if (lite) { window.__vitraliaError?.(why); return; }
+  store_.set('vitralia-lite', '1'); window.__vitraliaError?.(why + ' Carico la versione leggera…');
+  setTimeout(() => location.replace(location.pathname + '?lite'), 1600);
+}
+renderer.debug.onShaderError = () => goLite('Questo computer non supporta alcuni effetti grafici.');
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(PALETTE.night);
@@ -583,6 +595,7 @@ function resize() {
 addEventListener('resize', resize);
 
 const tmpC = new THREE.Color();
+let firstFrame = false;
 let last = performance.now() / 1000, frames = 0, fpsT = last, slowCount = 0;
 function frame() {
   const now = performance.now() / 1000, dt = Math.min(0.05, now - last); last = now;
@@ -613,7 +626,11 @@ function frame() {
   if (ui.tag._w) placeTag();
   composer.render(dt);
   // qualità adattiva: se il dispositivo fatica, si riduce la risoluzione
-  frames++; if (now - fpsT > 2) { const fps = frames / (now - fpsT); frames = 0; fpsT = now; if (fps < 38 && dpr > 1) { dpr = Math.max(1, dpr - 0.25); renderer.setPixelRatio(dpr); resize(); } else if (fps < 24 && ++slowCount > 1 && bloom.enabled) { bloom.enabled = false; } }
+  if (!firstFrame) { firstFrame = true; $('#loading').style.opacity = 0; setTimeout(() => ($('#loading').hidden = true), 800); }
+  // qualità adattiva: se il computer fatica si abbassa la risoluzione, poi si spegne il bagliore
+  frames++; if (now - fpsT > 1.2) { const fps = frames / (now - fpsT); frames = 0; fpsT = now;
+    if (fps < 32 && dpr > 0.6) { dpr = Math.max(0.6, dpr * 0.8); renderer.setPixelRatio(dpr); resize(); }
+    else if (fps < 22 && ++slowCount > 2 && bloom.enabled) { bloom.enabled = false; } }
   requestAnimationFrame(frame);
 }
 
@@ -623,4 +640,4 @@ const paidReturn = await returnFromStripe();
 if (!live && new URLSearchParams(location.search).get('scena') === 'lancio') { V.visible = tunnel.visible = false; setMoon(1); renderer.setClearColor(0x1b2a47); store.ctx.dept = 'business'; launch({ demoPreview: true }); }
 if (!paidReturn && store.state === 'INITIAL') intro();
 requestAnimationFrame(frame);
-setTimeout(() => { $('#loading').style.opacity = 0; setTimeout(() => ($('#loading').hidden = true), 800); }, 150);
+setTimeout(() => { $('#loading').style.opacity = 0; setTimeout(() => ($('#loading').hidden = true), 800); }, 5000); // di riserva: normalmente sparisce al primo fotogramma

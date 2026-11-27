@@ -87,6 +87,13 @@
 </div>
 <div id="loading"><span></span></div>
 
+<div id="err" role="alert" hidden></div>
+<script>
+// se qualcosa va storto, lo si vede sullo schermo (invece di una pagina ferma) e si può mandare una foto
+window.__vitraliaError = function (msg) { var e = document.getElementById('err'); if (!e) return; e.hidden = false; e.textContent = msg; var l = document.getElementById('loading'); if (l) l.hidden = true; };
+window.addEventListener('error', function (ev) { window.__vitraliaError('Errore: ' + (ev.message || 'caricamento non riuscito') + (ev.filename ? ' (' + ev.filename.split('/').pop() + ':' + ev.lineno + ')' : '')); });
+window.addEventListener('unhandledrejection', function (ev) { window.__vitraliaError('Errore: ' + ((ev.reason && ev.reason.message) || ev.reason)); });
+</script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
