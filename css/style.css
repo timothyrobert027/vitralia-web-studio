@@ -224,3 +224,5 @@ html,body{margin:0;height:100%;background:var(--night);color:var(--white);font:1
   #cfg[data-mode="room"] .room-foot .nav{width:auto;flex:1;justify-content:flex-end}
   #cfg[data-mode="room"] .room-foot .nav .btn{flex:0 1 auto;padding:10px 16px}#cfg[data-mode="room"] .nav .btn small{display:none}
 }
+#final .w{display:inline-block;white-space:nowrap}
+@media (max-width:560px){#final .orbit-title{font-size:clamp(24px,7.4vw,34px)}}

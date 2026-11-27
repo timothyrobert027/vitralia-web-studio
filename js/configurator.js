@@ -123,7 +123,9 @@ export function configurator(opts) {
     const prevRec = recommend();
     st.mode = mode; st.room = room;
     root.classList.remove('on'); // dissolvenza tra un passo e l'altro, mentre la camera si sposta
-    setTimeout(() => { render(); requestAnimationFrame(() => root.classList.add('on')); root.querySelector('.cfg-scroll').scrollTop = 0; }, mode === 'final' ? (opts.reduce ? 900 : 4600) : 380); // nel finale prima si guarda l'assemblaggio
+    // nel finale il pannello sparisce: si guarda l'assemblaggio e il decollo, la proposta arriva in orbita (proposal())
+    if (mode === 'final') setTimeout(() => { if (!root.classList.contains('on')) root.hidden = true; }, 400);
+    else setTimeout(() => { root.hidden = false; render(); requestAnimationFrame(() => root.classList.add('on')); root.querySelector('.cfg-scroll').scrollTop = 0; }, 380);
     if (mode === 'room') opts.onRoom(ORDER[room], room);
     if (mode === 'final') opts.onAssemble([...st.on], st.business);
     return prevRec;
@@ -170,10 +172,10 @@ export function configurator(opts) {
       root.hidden = false;
       if (initial && !st.started) { st.started = true; for (const id of ['pages', 'contact']) { st.on.add(id); opts.onToggle(id, true, true); } }
       if (st.mode === 'room') opts.onRoom(ORDER[st.room], st.room);
-      if (st.mode === 'final') opts.onAssemble([...st.on], st.business);
       render(); requestAnimationFrame(() => root.classList.add('on'));
     },
     close() { root.classList.remove('on'); root.hidden = true; onRecommend(null); },
     summary, mode: () => st.mode,
+    proposal() { st.mode = 'final'; root.hidden = false; render(); requestAnimationFrame(() => root.classList.add('on')); root.querySelector('.cfg-scroll').scrollTop = 0; },
   };
 }

@@ -31,7 +31,8 @@ const FLOW = {
   INTRO: ['PORTAL', 'LAB_EXTERIOR'],
   PORTAL: ['LAB_EXTERIOR'],
   LAB_EXTERIOR: ['FEATURE_SELECTION', 'DEPARTMENT_SELECTION'],
-  FEATURE_SELECTION: ['DEPARTMENT_SELECTION', 'DEPARTMENT_INTERIOR'],
+  FEATURE_SELECTION: ['DEPARTMENT_SELECTION', 'DEPARTMENT_INTERIOR', 'PREVIEW_FLIGHT'],
+  PREVIEW_FLIGHT: ['FEATURE_SELECTION', 'DEPARTMENT_SELECTION', 'DEPARTMENT_INTERIOR'], // il viaggio del sito prima dell'acquisto: nessun pagamento implicato
   DEPARTMENT_SELECTION: ['DEPARTMENT_INTERIOR', 'FEATURE_SELECTION'],
   DEPARTMENT_INTERIOR: ['WORKSTATION_SELECTION', 'DEPARTMENT_SELECTION'],
   WORKSTATION_SELECTION: ['BOARDING_PASS', 'DEPARTMENT_SELECTION', 'DEPARTMENT_INTERIOR'],
@@ -53,6 +54,7 @@ const store = {
   on(f) { this.subs.push(f); },
 };
 window.vitralia = { store };
+const ROOMS_VISIBLE = new Set(['INITIAL', 'INTRO', 'PORTAL', 'LAB_EXTERIOR', 'FEATURE_SELECTION', 'PREVIEW_FLIGHT']);
  // utile per i test
 
 // ================= dati =================
@@ -123,6 +125,7 @@ else Object.assign(mats.cardGlass, { color: new THREE.Color(0x1a2c52), opacity: 
 const cards = buildCards(lab.lab, mats, cfg.packages);
 const rk = buildRocket(lab.lab, mats, mobile);
 const rooms = buildRooms({ lab: lab.lab, mats, features: cfg.features || [], seats: lab.seats, mobile });
+store.on((st) => { const v = ROOMS_VISIBLE.has(st); for (const x of Object.values(rooms.stations)) x.g.visible = v; });
 
 // La V: a 20 unità gli strati in profondità si sommano e ricompongono esattamente il logo.
 const V_DEPTH = 20, ANCHOR_Y = -(1271 - 1150) / 154.4; // asse di convergenza degli strati (vgeometry.js)
@@ -166,10 +169,10 @@ function fitPass() {
 
 // Finale: il sito in orbita, la scia blu-verde acqua.
 const panel = new THREE.Group(); panel.visible = false; scene.add(panel); window.vitralia.panel = panel; window.vitralia.cam = cam; window.vitralia.space = space; window.vitralia.scene = scene; window.vitralia.moon = moon;
+const panelFace = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 9.1), new THREE.MeshBasicMaterial({ map: siteScreen(PALETTE.azure, 'Il tuo sito'), toneMapped: false, transparent: true, opacity: 0.95 }));
 {
   const glass = new THREE.Mesh(new RoundedBoxGeometry(16, 10.4, 0.5, 5, 0.9), mobile ? new THREE.MeshPhysicalMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.25, clearcoat: 1, envMapIntensity: 1.5, depthWrite: false }) : mats.heroGlass.clone());
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 9.1), new THREE.MeshBasicMaterial({ map: siteScreen(PALETTE.azure, 'Il tuo sito'), toneMapped: false, transparent: true, opacity: 0.95 }));
-  face.position.z = 0.27; panel.add(glass, face);
+  panelFace.position.z = 0.27; panel.add(glass, panelFace);
 }
 const trail = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
   uniforms: { r: { value: 0 }, c1: { value: C.blue.clone().multiplyScalar(1.8) }, c2: { value: C.teal.clone().multiplyScalar(1.8) } },
@@ -300,16 +303,17 @@ const conf = configurator({
   onToggle: (id, on, silent) => { rooms.set(id, on, silent); if (on && !silent) sound.chime(1175); },
   picker: (fn) => { pickFn = fn; },
   onRoom: (k) => {
+    const fromOrbit = store.state === 'PREVIEW_FLIGHT'; if (fromOrbit) { backToLab(); store.go('FEATURE_SELECTION'); }
     rooms.hideAssembly(); glow.dept = k; showCards(false); sound.whoosh();
     picks = rooms.picks().filter((p) => rooms.tiles[p.id].k === k).map((p) => ({ obj: p.obj, on: () => pickFn?.(p.id) }));
-    rig.fly(roomPose(k), { dur: reduce ? 1.2 : 2.6, via: [L(0, 3.4, 1.5)] });
+    rig.fly(roomPose(k), fromOrbit ? { dur: reduce ? 2 : 6, via: [...returnVia(), L(0, 3.4, 1.5)] } : { dur: reduce ? 1.2 : 2.6, via: [L(0, 3.4, 1.5)] });
   },
   onAssemble: (ids, name) => {
     picks = []; glow.dept = null; showCards(false); sound.whoosh();
-    rig.fly(P(L(0, 2.5, 10.5), L(0, 2.3, 2.0), 50), { dur: reduce ? 1 : 2.2, via: [L(0, 3.6, 4)], onDone: () => { rooms.assemble(ids, name); sound.chime(784); rig.fly(P(L(0, 2.35, 6.6), L(0, 2.3, 2.0), 50), { dur: 4 }); } });
+    rig.fly(P(L(0, 2.5, 10.5), L(0, 2.3, 2.0), 50), { dur: reduce ? 1 : 2.2, via: [L(0, 3.6, 4)], onDone: () => { rooms.assemble(ids, name); sound.chime(784); say('Il tuo sito è pronto. Ora lo facciamo decollare.', 3800); rig.fly(P(L(0, 2.35, 7.2), L(0, 2.3, 2.0), 50), { dur: 3.4, onDone: () => previewFlight(name) }); } });
   },
-  onGo: (k, req) => { store.ctx.request = req; conf.close(); rooms.hideAssembly(); openDept(k); },
-  onSkip: () => { store.ctx.request = conf.summary(); conf.close(); rooms.hideAssembly(); glow.dept = null; if (store.go('DEPARTMENT_SELECTION')) { rig.fly(LOBBY(), { dur: 2.4, via: [L(0, 3.4, 4)], onDone: lobbyReady }); showCards(true); } },
+  onGo: (k, req) => { store.ctx.request = req; conf.close(); rooms.hideAssembly(); const o = store.state === 'PREVIEW_FLIGHT'; if (o) backToLab(); openDept(k, o ? { dur: reduce ? 2 : 7, via: returnVia() } : null); },
+  onSkip: () => { store.ctx.request = conf.summary(); conf.close(); rooms.hideAssembly(); glow.dept = null; const o = store.state === 'PREVIEW_FLIGHT'; if (o) backToLab(); if (store.go('DEPARTMENT_SELECTION')) { rig.fly(LOBBY(), o ? { dur: reduce ? 2 : 6, via: returnVia(), onDone: lobbyReady } : { dur: 2.4, via: [L(0, 3.4, 4)], onDone: lobbyReady }); showCards(true); } },
 });
 function openConfig() { if (!store.go('FEATURE_SELECTION')) return; picks = []; dock(null); say(null); tagAt(null); showCards(false); conf.open(); }
 function lobbyReady() {
@@ -334,14 +338,14 @@ function backToLobby() {
 
 // 5 - dentro il reparto, le postazioni
 const deptPose = (k) => { const d = DEPTS[k], mid = (d.phi[0] + d.phi[1]) / 2; return P(polar(2.2, mid, 4.3).add(LAB), polar(12.6, mid, 0.5).add(LAB), 54); };
-function openDept(k) {
+function openDept(k, path) {
   const from = store.state;
   if (!store.go('DEPARTMENT_INTERIOR', { dept: k, slot: null })) return;
   picks = []; dock(null); say(null); tagAt(null); passOff(); resetSeat(); sound.whoosh();
   glow.dept = k; showCards(false);
   const to = deptPose(k), mid = (DEPTS[k].phi[0] + DEPTS[k].phi[1]) / 2;
   const via = from === 'DEPARTMENT_SELECTION' || from === 'FEATURE_SELECTION' ? [L(0, 3.4, 5.2), polar(2.2, mid, 3.6).add(LAB)] : [polar(4.5, mid + 25, 3.3).add(LAB), L(0, 3.8, 0)];
-  rig.fly(to, { dur: 3.6, via, onDone: () => seatsReady(k) });
+  rig.fly(to, path ? { dur: path.dur, via: [...path.via, L(0, 3.4, 5.2), polar(2.2, mid, 3.6).add(LAB)], onDone: () => seatsReady(k) } : { dur: 3.6, via, onDone: () => seatsReady(k) });
 }
 let seatFocus = null;
 function seatsReady(k) {
@@ -444,13 +448,31 @@ async function checkout() {
 
 // 8 - lancio e orbita
 const ROCKET_VIEW = () => P(L(12, 3.5, 36), L(31, 7.5, 7), 44);
+// prima dell'acquisto: il sito appena assemblato decolla e arriva in orbita, poi in orbita arriva la proposta
+function previewFlight(name) {
+  if (!store.go('PREVIEW_FLIGHT')) return;
+  panelFace.material.map = siteScreen(PALETTE.azure, name || 'Il tuo sito'); panelFace.material.needsUpdate = true;
+  flyToPad({ preview: true });
+}
+// dall'orbita al laboratorio: si torna giù verso la Luna e si rientra dall'ingresso
+const returnVia = () => [cam.position.clone().add(new THREE.Vector3(0, 60, 220)), new THREE.Vector3(10, 260, -1700), L(0, 120, 260), L(0, 14, R_LAB + 30), L(0, 3.4, R_LAB + 4), L(0, 3.0, 9)];
+function backToLab() {
+  fx = null; hideFinal(); trail.visible = false; panel.visible = false; comet.visible = false; dust.visible = false;
+  const R = rk.rocket; rk.group.add(R); R.position.set(0, 0.5, 0); R.quaternion.identity(); R.scale.setScalar(1); R.visible = true;
+  rk.flameMat.uniforms.k.value = 0; rk.engineLight.intensity = 0; for (const sm of rk.smoke) sm.s.material.opacity = 0;
+  lab.lab.visible = true; renderer.setClearColor(0x1b2a47); rig.breath = 1; say(null);
+}
+function hideFinal() { ui.final.classList.remove('on'); setTimeout(() => { if (!ui.final.classList.contains('on')) ui.final.hidden = true; }, 900); }
 function launch(patch) {
   if (!store.go('LAUNCH', patch)) return;
+  flyToPad({});
+}
+function flyToPad({ preview }) {
   passOff(); picks = []; dock(null); tagAt(null); $('#skip').hidden = true;
   const k = store.ctx.dept, mid = k ? (DEPTS[k].phi[0] + DEPTS[k].phi[1]) / 2 : 90;
   const via = cam.position.distanceTo(LAB) < R_LAB ? [polar(6, mid, 3.2).add(LAB), L(0, 3.2, 9), L(0, 3.4, R_LAB + 4), L(5, 4, R_LAB + 14)] : [];
   dust.visible = true;
-  rig.fly(ROCKET_VIEW(), { dur: via.length ? 6 : 0.01, via, lookVia: via.length ? [L(0, 2.6, R_LAB), L(20, 5, R_LAB + 6)] : null, onDone: ignite });
+  rig.fly(ROCKET_VIEW(), { dur: via.length ? 6 : 0.01, via, lookVia: via.length ? [L(0, 2.6, R_LAB), L(20, 5, R_LAB + 6)] : null, onDone: () => ignite(preview) });
 }
 let fx = null;
 const ORBIT_POSE = () => P([0, 230, -3500], [0, 430, -5000], 50);
@@ -458,19 +480,19 @@ const ORBIT_POSE = () => P([0, 230, -3500], [0, 430, -5000], 50);
 function finale() {
   const end = ORBIT_POSE(), f = end.t.clone().sub(end.p).normalize(), right = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize(), up = new THREE.Vector3().crossVectors(right, f);
   const portrait = innerWidth / innerHeight < 1;
-  return { end, f, right, up, portrait, at: end.p.clone().addScaledVector(f, 80).addScaledVector(right, portrait ? 0 : 27).addScaledVector(up, portrait ? 19 : 6) };
+  return { end, f, right, up, portrait, at: end.p.clone().addScaledVector(f, 80).addScaledVector(right, portrait ? 0 : 42).addScaledVector(up, portrait ? 31 : 4) };
 }
-function ignite() {
-  say(store.ctx.demoPreview ? 'Anteprima: decollo.' : 'Decollo.', 2500); sound.engine(); rig.breath = 0; rig.move = null;
+function ignite(preview) {
+  say(preview ? 'Il tuo sito decolla.' : store.ctx.demoPreview ? 'Anteprima: decollo.' : 'Decollo.', 2500); sound.engine(); rig.breath = 0; rig.move = null;
   const R = rk.rocket; scene.attach(R); // il razzo lascia la rampa: da qui vive nel mondo
   const start = R.position.clone(), F = finale();
   // la rotta: sale in verticale, si inclina verso la Terra e la raggiunge in orbita (la Terra resta sempre davanti, dietro al razzo)
   const route = new THREE.CatmullRomCurve3([start, start.clone().add(new THREE.Vector3(0, 40, 0)), start.clone().add(new THREE.Vector3(-4, 135, -55)), start.clone().add(new THREE.Vector3(-14, 290, -430)),
     new THREE.Vector3(10, 120, -1900), F.end.p.clone().addScaledVector(F.f, 150).addScaledVector(F.right, F.portrait ? -25 : -60).addScaledVector(F.up, F.portrait ? -45 : -38),
-    F.end.p.clone().addScaledVector(F.f, 105).addScaledVector(F.right, F.portrait ? -8 : 0).addScaledVector(F.up, F.portrait ? 0 : -6), F.at.clone()], false, 'centripetal');
+    F.end.p.clone().addScaledVector(F.f, 105).addScaledVector(F.right, F.portrait ? -8 : 12).addScaledVector(F.up, F.portrait ? 0 : -8), F.at.clone()], false, 'centripetal');
   trail.geometry.dispose(); trail.geometry = new THREE.TubeGeometry(route, 900, 0.2, 8, false); trail.visible = true; trail.material.uniforms.r.value = 0;
   panel.position.copy(F.at); panel.lookAt(F.end.p); if (!F.portrait) panel.rotateY(-0.3); panel.userData.y0 = panel.position.y; panel.scale.setScalar(0.001);
-  fx = { t0: performance.now() / 1000, camFrom: cam.position.clone(), lookFrom: rig.look.clone(), route, F, o0: cam.position.clone().sub(start), o1: F.end.p.clone().sub(F.at), T: reduce ? 8 : 16 };
+  fx = { t0: performance.now() / 1000, camFrom: cam.position.clone(), lookFrom: rig.look.clone(), route, F, o0: cam.position.clone().sub(start), o1: F.end.p.clone().sub(F.at), T: reduce ? 8 : 16, preview };
 }
 const _q = new THREE.Quaternion(), _y = new THREE.Vector3(0, 1, 0), _v = new THREE.Vector3(), _w = new THREE.Vector3();
 function tickLaunch(now) {
@@ -503,7 +525,11 @@ function tickLaunch(now) {
   cam.lookAt(rig.look);
   if (u > 0.55 && lab.lab.visible) lab.lab.visible = false;
   // il razzo arriva e diventa il sito in orbita
-  if (u >= 1 && !fx.arrived) { fx.arrived = now; store.go('ORBIT'); say(null); flash(now); setTimeout(showFinal, reduce ? 200 : 900); }
+  if (u >= 1 && !fx.arrived) {
+    fx.arrived = now; say(null); flash(now);
+    if (fx.preview) { setTimeout(() => showFinal(true), reduce ? 200 : 900); setTimeout(() => { if (store.state === 'PREVIEW_FLIGHT') { hideFinal(); conf.proposal(); } }, reduce ? 2500 : 7500); }
+    else { store.go('ORBIT'); setTimeout(() => showFinal(false), reduce ? 200 : 900); }
+  }
   if (fx.arrived) {
     const d = now - fx.arrived, s = smooth(d / 1.2);
     R.scale.setScalar(Math.max(0.001, 1 - s)); panel.visible = true; panel.scale.setScalar(0.001 + smooth((d - 0.3) / 1.6));
@@ -515,14 +541,17 @@ function tickLaunch(now) {
 // dopo l'arrivo non si sta fermi: la camera continua a scivolare in orbita
 const drift = (d) => (reduce ? new THREE.Vector3() : new THREE.Vector3(Math.sin(d * 0.05) * 16, Math.sin(d * 0.07) * 5, -Math.sin(d * 0.035) * 22));
 function flash(now) { fx.flashT = now; sound.chime(660); }
-function showFinal() {
+function showFinal(preview) {
   renderer.setClearColor(0x000000);
+  ui.final.querySelector('.orbit-title').innerHTML = preview ? 'IL TUO SITO<br>È PRONTO PER L\'<span class="hl">ORBITA.</span>' : 'IL TUO SITO<br>È IN <span class="hl">ORBITA.</span>';
+  for (const el of ui.final.querySelectorAll('.orbit-brand, .orbit-claim')) el.textContent = el.textContent;
+  ui.final.querySelector('.demo')?.remove(); $('#again').hidden = !!preview;
   // ogni lettera entra da sola, poi il blocco galleggia
   ui.final.querySelectorAll('.orbit-title, .orbit-brand, .orbit-claim').forEach((el) => {
-    let i = 0; const wrap = (node) => { for (const n of [...node.childNodes]) { if (n.nodeType === 3) { const frag = document.createDocumentFragment(); for (const ch of n.textContent) { const sp = document.createElement('span'); sp.className = 'ch'; sp.textContent = ch; sp.style.setProperty('--i', i++); frag.append(sp); } n.replaceWith(frag); } else if (n.nodeName !== 'BR') wrap(n); } };
+    let i = 0; const wrap = (node) => { for (const n of [...node.childNodes]) { if (n.nodeType === 3) { const frag = document.createDocumentFragment(); for (const part of n.textContent.split(/(\s+)/)) { if (!part) continue; if (/^\s+$/.test(part)) { frag.append(part); continue; } const w = document.createElement('span'); w.className = 'w'; for (const ch of part) { const sp = document.createElement('span'); sp.className = 'ch'; sp.textContent = ch; sp.style.setProperty('--i', i++); w.append(sp); } frag.append(w); } n.replaceWith(frag); } else if (n.nodeName !== 'BR') wrap(n); } };
     wrap(el);
   });
-  if (store.ctx.demoPreview) ui.final.querySelector('.orbit-claim').insertAdjacentHTML('afterend', '<p class="demo">Anteprima dimostrativa: nessun ordine è stato creato.</p>');
+  if (!preview && store.ctx.demoPreview) ui.final.querySelector('.orbit-claim').insertAdjacentHTML('afterend', '<p class="demo">Anteprima dimostrativa: nessun ordine è stato creato.</p>');
   ui.final.hidden = false; requestAnimationFrame(() => ui.final.classList.add('on'));
 }
 $('#again').addEventListener('click', () => { location.href = location.pathname; });

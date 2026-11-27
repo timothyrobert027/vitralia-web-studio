@@ -15,7 +15,9 @@ Un solo mondo three.js (r160, moduli ES, nessuna build): la V del logo nello spa
 | `data/config.json` | Prezzi, acconto, postazioni e date. **Le postazioni attuali sono dimostrative** |
 | `netlify/functions/*` | Backend: disponibilità, riserva, Stripe Checkout, webhook, verifica ordine |
 
-Stati: `INITIAL → INTRO → PORTAL → LAB_EXTERIOR → DEPARTMENT_SELECTION → DEPARTMENT_INTERIOR → WORKSTATION_SELECTION → BOARDING_PASS → PAYMENT → LAUNCH → ORBIT`.
+Stati: `INITIAL → INTRO → PORTAL → LAB_EXTERIOR → FEATURE_SELECTION → PREVIEW_FLIGHT → DEPARTMENT_INTERIOR → WORKSTATION_SELECTION → BOARDING_PASS → PAYMENT → LAUNCH → ORBIT`.
+
+Il viaggio completo arriva prima dell'acquisto. Il sito assemblato decolla (`PREVIEW_FLIGHT`, testo "Il tuo sito è pronto per l'orbita."), poi in orbita compaiono la proposta e il modulo di contatto. Infine si torna al laboratorio per reparto, postazione e pagamento. Dopo un pagamento confermato il lancio si ripete con il testo "Il tuo sito è in orbita.".
 Il passaggio a `LAUNCH` viene rifiutato se il pagamento non è confermato. L'unica eccezione è l'anteprima demo, chiaramente etichettata.
 
 ## Modalità demo e produzione
